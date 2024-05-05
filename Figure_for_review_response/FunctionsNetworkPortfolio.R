@@ -847,7 +847,7 @@ linfun3=function(Sn,b,lambda,a1=1)
   A1=cbind(-Sn)
   A2=-A1
   A=rbind(A0,A1,A2)
-  rhs=c(rep(0,p),c(-b,b)-lambda*rep(1,p))
+  rhs=c(rep(0,p),c(-b,b)-lambda*rep(1,2*p))
   C=rep(1,p)
   EE=diag(a)
   a[1]=a1
@@ -856,7 +856,12 @@ linfun3=function(Sn,b,lambda,a1=1)
   #	FF=1
   solvetheta=linp(E=EE,F=FF,
     G=A,H=rhs,Cost=C,ispos=FALSE)$X
-  # return(solvetheta)
+  # Solves a linear programming problem,
+  #               min(sum(Cost_i x_i))
+  # subject to
+  #               Ex=f
+  #               Gx>=h
+  #               x_i>=0
   return(solvetheta)
 }
 linfun4=function(Sn,b,lambda,a1=1,indx=1)
