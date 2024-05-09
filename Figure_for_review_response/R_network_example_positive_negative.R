@@ -20,6 +20,9 @@ EC = eigen_centrality(g,directed = FALSE, scale = TRUE)$vector
 print(round(EC,2))
 print(round(sum(EC),2))
 Gamma = diag(eigen_centrality(g)$vector)
+w1 = rep(0.125,8)
+w1%*%Gamma%*%A
+print(round(rowSums(w1%*%A%*%Gamma),3))
 print(round(rowSums(A%*%Gamma),2))
 print(round(A%*%EC,2))
 print(round(sum(A%*%EC),2))
@@ -37,17 +40,19 @@ dev.off()
 
 
 ###### Network 2 with positive and negative weights ######
-A = as.matrix(read.csv("Mat_A.csv"))
-A[abs(A)>0.39] = -A[abs(A)>0.39]
-# xtable= xtable(A)
-# print(xtable, include.rownames = FALSE,inlcude.colnames = FALSE) 
-A
+#write.csv(A,file="Mat_A2.csv",row.names = FALSE)
+A = as.matrix(read.csv("Mat_A2.csv"))
+print(round(A,2))
+
 g <- graph_from_adjacency_matrix(C, mode = "undirected", weighted = TRUE, diag = FALSE)
 g <- graph_from_adjacency_matrix(A, mode = "undirected", weighted = TRUE, diag = FALSE)
 EC = eigen_centrality(g,directed = FALSE, scale = TRUE)$vector
 print(round(EC,2))
 print(round(sum(EC),2))
 Gamma = diag(eigen_centrality(g)$vector)
+w1 = rep(0.125,8)
+w1%*%A%*%Gamma
+print(round(rowSums(w1%*%A%*%Gamma),3))
 print(round(rowSums(A%*%Gamma),2))
 print(round(A%*%EC,2))
 print(round(sum(A%*%EC),2))
