@@ -842,7 +842,7 @@ linfun3=function(Sn,b,lambda,a1=1)
   #						hatS x>=-lambda 1+b
   #						x(1)=a1
   a=rep(0,p)
-  a[1]=1
+  a[1]=a1
   A0=diag(1,p,p)
   A1=cbind(-Sn)
   A2=-A1
@@ -850,7 +850,6 @@ linfun3=function(Sn,b,lambda,a1=1)
   rhs=c(rep(0,p),c(-b,b)-lambda*rep(1,2*p))
   C=rep(1,p)
   EE=diag(a)
-  a[1]=a1
   FF=a
   #	EE=rep(c(0,1),c(p,p))
   #	FF=1
