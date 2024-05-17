@@ -1,17 +1,30 @@
 rm(list = ls())
+setwd("~/Documents/GitHub/Network-Portfolio/Figure_for_review_response")
+source('./PackagesNetworkPortfolio.R')
+source('./FunctionsNetworkPortfolio.R')
 
 library(quadprog)
 
 # Define the covariance matrix Sigma_mu (replace with actual values)
+# Sigma_xi <- matrix(c(
+#   1.0 , 0 , 0 , 0 , 0 , 0 , 0 , 0,
+#   0 , 0.9 , 0 , 0 , 0 , 0 , 0 , 0,
+#   0 , 0 , 0.9 , 0 , 0 , 0 , 0 , 0,
+#   0 , 0 , 0 , 0.9 , 0 , 0 , 0 , 0,
+#   0 , 0 , 0 , 0 , 1.2 , 0 , 0 , 0,
+#   0 , 0 , 0 , 0 , 0 , 1.1 , 0 , 0,
+#   0 , 0 , 0 , 0 , 0 , 0 , 0.8 , 0,
+#   0 , 0 , 0 , 0 , 0 , 0 , 0 , 1.3
+# ), nrow = 8, byrow = TRUE)
 Sigma_xi <- matrix(c(
-  1.0 , 0 , 0 , 0 , 0 , 0 , 0 , 0,
-  0 , 0.9 , 0 , 0 , 0 , 0 , 0 , 0,
-  0 , 0 , 0.9 , 0 , 0 , 0 , 0 , 0,
-  0 , 0 , 0 , 0.9 , 0 , 0 , 0 , 0,
-  0 , 0 , 0 , 0 , 1.2 , 0 , 0 , 0,
-  0 , 0 , 0 , 0 , 0 , 1.1 , 0 , 0,
-  0 , 0 , 0 , 0 , 0 , 0 , 0.8 , 0,
-  0 , 0 , 0 , 0 , 0 , 0 , 0 , 1.3
+  1.0 , 0.5, 0.3, 0.2, 0.1, 0, 0, 0,
+  0.5 , 0.9, 0.5, 0.3, 0.2, 0.1, 0, 0,
+  0.3 , 0.5, 0.9, 0.5, 0.3, 0.2, 0.1, 0,
+  0.2 , 0.3, 0.5, 0.9, 0.5, 0.3, 0.2, 0.1,
+  0.1 , 0.2, 0.3, 0.5, 1.2, 0.5, 0.3, 0.2,
+  0 ,   0.1, 0.2, 0.3, 0.5, 1.1, 0.5, 0.3,
+  0 ,   0 ,  0.1, 0.2, 0.3, 0.5, 0.8, 0.5,
+  0 ,   0 ,  0 ,  0.1, 0.2, 0.3, 0.5, 1.3
 ), nrow = 8, byrow = TRUE)
 
 # Generate random samples from the normal distribution
@@ -114,7 +127,7 @@ print(B_1 %*% rep(1,8))
 # min t(w)%*%Sigma_xi%*%w
 # s.t. sum(w)=1
 #      t( A %*% Gamma %*%matrix(1, 8, 1) )%*%w <= M
-M = 100
+M = 0.8
 Dmat <- Sigma_xi  
 dvec <- rep(0,8)  # Coefficients of the linear term in the objective function (zero in this case)
 Amat <- cbind(matrix(1, 8, 1), -A %*% Gamma %*%matrix(1, 8, 1))  
