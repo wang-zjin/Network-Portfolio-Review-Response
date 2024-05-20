@@ -2,6 +2,11 @@ rm(list = ls())
 setwd("~/Documents/GitHub/Network-Portfolio/Figure_for_review_response")
 source('./PackagesNetworkPortfolio.R')
 source('./FunctionsNetworkPortfolio.R')
+# Install and load the clusterGeneration package
+if (!require(clusterGeneration)) {
+  install.packages("clusterGeneration")
+  library(clusterGeneration)
+}
 
 library(quadprog)
 
@@ -46,14 +51,25 @@ xi <- MASS::mvrnorm(n, mu = rep(0, 8), Sigma = Sigma_xi)
 #   0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0
 # ), nrow = 8, byrow = TRUE)
 
-# We can also consider the following A example
-A = as.matrix(read.csv("Mat_A.csv"))
-A[1,4] = A[4,1] = -A[1,4]
-A[2,3] = A[3,2] = -A[2,3]
-A[2,5] = A[5,2] = -A[2,5]
-A[2,7] = A[7,2] = -A[2,7]
-A[3,5] = A[5,3] = -A[3,5]
-A[3,6] = A[6,3] = -A[3,6]
+# # We can also consider the following A example
+# A = as.matrix(read.csv("Mat_A.csv"))
+# A[1,4] = A[4,1] = -A[1,4]
+# A[2,3] = A[3,2] = -A[2,3]
+# A[2,5] = A[5,2] = -A[2,5]
+# A[2,7] = A[7,2] = -A[2,7]
+# A[3,5] = A[5,3] = -A[3,5]
+# A[3,6] = A[6,3] = -A[3,6]
+# print(A)
+
+# Set the random seed for reproducibility
+set.seed(123)
+# Generate a random positive definite matrix
+random_pd_matrix <- genPositiveDefMat(dim = 8)$Sigma
+# Convert the positive definite matrix to a correlation matrix
+A <- cov2cor(random_pd_matrix)
+A = abs(A)
+diag(A) = 0
+# Print the random correlation matrix
 print(A)
 
 # Define diagonal matrix Gamma 
@@ -127,7 +143,7 @@ print(B_1 %*% rep(1,8))
 # min t(w)%*%Sigma_xi%*%w
 # s.t. sum(w)=1
 #      t( A %*% Gamma %*%matrix(1, 8, 1) )%*%w <= M
-M = 0.716
+M = 0.3055
 Dmat <- Sigma_xi  
 dvec <- rep(0,8)  # Coefficients of the linear term in the objective function (zero in this case)
 Amat <- cbind(matrix(1, 8, 1), -A %*% Gamma %*%matrix(1, 8, 1))  
