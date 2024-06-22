@@ -15,7 +15,7 @@ libraries = c("matrixcalc", "MASS", "PortfolioAnalytics",
               "tcltk2","limSolve",
               "MTS","Matrix","pracma","glasso","MST", "IntroCompFinR",
               "RColorBrewer", "broom", "egg", "nloptr", "fAssets",
-              "magick") 
+              "magick","tictoc") 
               
 lapply(libraries, function(x) if (!(x %in% installed.packages())) {
   install.packages(x)
