@@ -56,7 +56,7 @@ for(t in 1: length(W_in)){
 tic("Tuning parameter of Dantzig estimation")
 
 lmd.EC.Dantzig.list = list()
-for (t in c(11:60)) {
+for (t in c(0:60)) {
   n<-dim(W_in[[(t+1)]])[1]
   B=100
   n.block=floor(n/B)
@@ -103,12 +103,102 @@ for (t in c(11:60)) {
     }
     lmd.i[valid.block]=min(cv.l.lmd[which(cv.l.error==min(cv.l.error))])
   }
-  lmd=mean(lmd.i)
-  lmd.EC.Dantzig <- 0.682
+  lmd=mean(lmd.i[lmd.i<Inf])
+  # lmd.EC.Dantzig <- 0.682
+  lmd.EC.Dantzig <- lmd
   lmd.EC.Dantzig.list[[t+1]] = lmd.EC.Dantzig
 }
 toc()
 
+save(lmd.EC.Dantzig.list,file="Dantzig_lambda_rolling_window.RData")
+
+mean(unlist(lmd.EC.Dantzig.list))
+std(unlist(lmd.EC.Dantzig.list))
+
+####### Different window size: 750, 1000 ######
+tic("Tuning parameter of Dantzig estimation")
+# rolling window
+W<-list()
+for(t in 0: (floor((1857-750)/22)-1)){
+  W[[(t+1)]]=returnstd[(1+t*22):(772+t*22),]
+}
+W_in<-list()
+W_out<-list()
+for(t in 0: (floor((1857-750)/22)-1)){
+  W_in[[(t+1)]]=W[[t+1]][c(1:750),]
+  W_out[[(t+1)]]=W[[t+1]][c(751:772),]
+}
+T.windows<-length(W)
+# correlation matrix, Expected return, covariance matrix
+C_in <- list()
+ER_in <- list()
+COV_in <- list()
+EC_in <- list()
+for(t in 1: length(W_in)){
+  C_in[[(t)]] =cor(W_in[[(t)]])
+  ER_in[[(t)]] = colMeans(W_in[[(t)]])
+  COV_in[[(t)]] = cov(W_in[[(t)]])
+  network_port = network.correlation(W_in[[(t)]])
+  EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+  max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+}
+
+lmd.EC.Dantzig.list = list()
+for (t in c(0:49)) {
+  n<-dim(W_in[[(t+1)]])[1]
+  B=100
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  lmd.i=c()
+  for (valid.block in 1:n.block) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=W_in[[(t+1)]][train.ind,]
+    returnstd.valid=W_in[[(t+1)]][valid.ind,]
+    mu.train=rep(0,p)
+    mu.valid=rep(0,p)
+    
+    corr.train=cor(returnstd.train)
+    corr.train[is.na(corr.train)]=0
+    A.train=corr.train-diag(1,p,p)
+    corr.valid=cor(returnstd.valid)
+    corr.valid[is.na(corr.valid)]=0
+    A.valid=corr.valid-diag(1,p,p)
+    
+    cov.train=A.train-diag(max(eigen(A.train)$value),p,p)
+    cov.valid=A.valid-diag(max(eigen(A.valid)$value),p,p)
+    lambda.grid=seq(0,1,length=101)[2:101]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l.lmd=NULL
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      print(i)
+      # lmd=0.2
+      lin.train=linfun3(cov.train,mu.train,lmd,abs(eigen(cov.valid)$vector[1,1]))
+      # max(lin.train)
+      # max(cov.train%*%lin.train)
+      if(!(all(lin.train==0))){
+        error=sum((cov.valid%*%lin.train-mu.valid)^2)
+        cv.l.error=c(cv.l.error,error)
+        cv.l.lmd=c(cv.l.lmd, lmd)
+      }
+    }
+    lmd.i[valid.block]=min(cv.l.lmd[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd=mean(lmd.i[lmd.i<Inf])
+  # lmd.EC.Dantzig <- 0.682
+  lmd.EC.Dantzig <- lmd
+  lmd.EC.Dantzig.list[[t+1]] = lmd.EC.Dantzig
+}
+toc()
 
 
 #   EC_DS <- eigenvector centrality estimated by Dantzig selector
