@@ -20,6 +20,10 @@ p=dim(return)[2]
 node.label=colnames(returnstd)
 names(returnstd) = node.label
 
+#### Calibrate the hyperparameter of Dantzig Selector for Eigenvector Centrality, using rolling window, with different window size: 500/750/1000 #####
+##### Task 1: window size 500 #####
+
+tic("Tuning parameter of Dantzig estimation")
 # rolling window
 W<-list()
 for(t in 0: (floor((1857-500)/22)-1)){
@@ -47,12 +51,6 @@ for(t in 1: length(W_in)){
   min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
   boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
 }
-
-##### Task 1: Calibrate the hyperparameter by rolling window, which is used in Dantzig selector estimation for eigenvector centrality #####
-
-###### CV for tuning lambda in estimation eigenvector centrality using a rolling window of length 500 data ######
-
-tic("Tuning parameter of Dantzig estimation")
 
 lmd.EC.Dantzig.list = list()
 for (t in c(0:60)) {
@@ -111,13 +109,31 @@ toc()
 
 save(lmd.EC.Dantzig.list,file="Dantzig_lambda_rolling_window.RData")
 
-lmd.EC.Dantzig.list = load("~/Documents/GitHub/Network-Portfolio/RR_Hyperparameter_Calibration/Dantzig_lambda_rolling_window.RData")
+load("~/Documents/GitHub/Network-Portfolio/RR_Hyperparameter_Calibration/Dantzig_lambda_rolling_window.RData")
 mean(unlist(lmd.EC.Dantzig.list))
 std(unlist(lmd.EC.Dantzig.list))
 
-##### Different window size: 750, 1000 ######
+lmd.EC.Dantzig.WS500=lmd.EC.Dantzig.list[[1]] # 0.682
+lmd.EC.Dantzig = lmd.EC.Dantzig.WS500
 
-##### Tasks 2: window size: 750 ######
+#   EC_DS <- eigenvector centrality estimated by Dantzig selector
+EC_DS<-list()
+a=c()
+for (t in 1: length(W_in)) {
+  print(t)
+  EC_DS[[t]] =linfun3(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p))$vector[1,1]))
+  EC_DS[[t]]=EC_DS[[t]]/max(EC_DS[[t]])
+  # boxplot(EC_DS[[t]])
+  a[t]=sum(EC_DS[[t]]==0)
+}
+a
+eigenvector_centrality = list("eigenvector_absolute_value"=EC_in,"eigenvector_centrality_Dantzig"=EC_DS,
+                              "zeors_in_EC_DS"=a,"covariance_matrix"=COV_in,"correlation_matrix"=C_in,
+                              "expected_return"=ER_in)
+save(eigenvector_centrality,file = "eigenvector_centrality_WS500_20240723.RData")
+
+##### Different window size: 750, 1000
+##### Task 2: window size: 750 ######
 
 tic("Tuning parameter of Dantzig estimation using 750 window size")
 # rolling window
@@ -204,11 +220,37 @@ for (t in c(0)) {
 toc()
 # uning parameter of Dantzig estimation using 750 window size: 1967.792 sec elapsed
 save(lmd.EC.Dantzig.list,file="Dantzig_lambda_rolling_window_windowsize750.RData")
-load("Dantzig_lambda_rolling_window_windowsize750.RData")
+load("Dantzig_lambda_rolling_window_750.RData")
 mean(unlist(lmd.EC.Dantzig.list)) # 0.5085714
 std(unlist(lmd.EC.Dantzig.list))
+load("Dantzig_lambda_rolling_window_750.RData")
+lmd.EC.Dantzig.WS750=lmd.EC.Dantzig.list[[1]] # 0.5085714
+lmd.EC.Dantzig = lmd.EC.Dantzig.WS750
 
-##### Tasks 3: window size: 1000 ######
+#   EC_DS <- eigenvector centrality estimated by Dantzig selector
+EC_DS<-list()
+a=c()
+for (t in 1: length(W_in)) {
+  print(t)
+  EC_DS[[t]] =linfun3(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p))$vector[1,1]))
+  EC_DS[[t]]=EC_DS[[t]]/max(EC_DS[[t]])
+  # boxplot(EC_DS[[t]])
+  a[t]=sum(EC_DS[[t]]==0)
+}
+a
+eigenvector_centrality = list("eigenvector_absolute_value"=EC_in,"eigenvector_centrality_Dantzig"=EC_DS,
+                              "zeors_in_EC_DS"=a,"covariance_matrix"=COV_in,"correlation_matrix"=C_in,
+                              "expected_return"=ER_in)
+save(eigenvector_centrality,file = "eigenvector_centrality_WS750_20240723.RData")
+
+load("eigenvector_centrality_WS750_20240723.RData")
+EC_in=eigenvector_centrality$eigenvector_absolute_value
+EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
+ER_in=eigenvector_centrality$expected_return
+C_in=eigenvector_centrality$correlation_matrix
+COV_in=eigenvector_centrality$covariance_matrix
+
+##### Task 3: window size: 1000 ######
 
 tic("Tuning parameter of Dantzig estimation using 1000 window size")
 # rolling window
@@ -293,12 +335,13 @@ for (t in c(0:37)) {
   lmd.EC.Dantzig.list[[t+1]] = lmd.EC.Dantzig
 }
 toc()
-#Tuning parameter of Dantzig estimation using 1000 window size: 2553.25 sec elapsed
+# Tuning parameter of Dantzig estimation using 1000 window size: 145670.28 sec elapsed
 save(lmd.EC.Dantzig.list,file="Dantzig_lambda_rolling_window_windowsize1000.RData")
 load("Dantzig_lambda_rolling_window_windowsize1000.RData")
-mean(unlist(lmd.EC.Dantzig.list)) # 0.452
-std(unlist(lmd.EC.Dantzig.list)) # 0.452
+mean(unlist(lmd.EC.Dantzig.list)) # 0.6292105
+std(unlist(lmd.EC.Dantzig.list)) # 0.1288219
 
+lmd.EC.Dantzig = 0.452 # lmd.EC.Dantzig.list[[1]]
 
 #   EC_DS <- eigenvector centrality estimated by Dantzig selector
 EC_DS<-list()
@@ -314,23 +357,25 @@ a
 eigenvector_centrality = list("eigenvector_absolute_value"=EC_in,"eigenvector_centrality_Dantzig"=EC_DS,
                               "zeors_in_EC_DS"=a,"covariance_matrix"=COV_in,"correlation_matrix"=C_in,
                               "expected_return"=ER_in)
-save(eigenvector_centrality,file = "eigenvector_centrality_20230513.RData")
+save(eigenvector_centrality,file = "eigenvector_centrality_WS1000_20240723.RData")
 
-load("eigenvector_centrality_20230513.RData")
+load("eigenvector_centrality_WS1000_20240723.RData")
 EC_in=eigenvector_centrality$eigenvector_absolute_value
 EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
 ER_in=eigenvector_centrality$expected_return
 C_in=eigenvector_centrality$correlation_matrix
 COV_in=eigenvector_centrality$covariance_matrix
 
-#### Dantzig estimation ####
+#### Dantzig selector estimation for portfolio parameters ####
 
-##### CV for tuning lambda #####
+##### CV for tuning lambdas in portfolio solutions
 
-# ###### CV for tuning lambda in estimation Sigma^-1 1 using the first 500 data ######
+##### CV for tuning lambda in estimation Sigma^-1 1 using the first 500/750/1000 data ######
+###### Task 1: window size 500  ######
 
 # Use for recurrence
-n<-dim(returnstd[1:500,])[1]
+window_size = 500
+n<-dim(returnstd[1:window_size,])[1]
 B=100
 n.block=floor(n/B)
 block.start=1+(0:(n.block-1))*B
@@ -344,8 +389,8 @@ for (valid.block in 1:5) {
   n.valid=length(valid.ind)
   train.ind=setdiff(1:n,valid.ind)
   n.train=length(train.ind)
-  returnstd.train=returnstd[1:500,][train.ind,]
-  returnstd.valid=returnstd[1:500,][valid.ind,]
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
   mu.train=rep(1,p)
   mu.valid=rep(1,p)
   cov.train=cov(returnstd.train)
@@ -367,11 +412,15 @@ for (valid.block in 1:5) {
   lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
 }
 lmd.i
-lmd1=mean(lmd.i)
+lmd1.WS500=mean(lmd.i)
+lmd1.WS500=0.4636
 lmd1=0.4636
 
-###### CV for tuning lambda in estimation Sigma^-1 mu, using the first 500 data ######
-n<-dim(returnstd[1:500,])[1]
+###### Task 2: window size 750  ######
+
+# Use for recurrence
+window_size = 750
+n<-dim(returnstd[1:window_size,])[1]
 B=100
 n.block=floor(n/B)
 block.start=1+(0:(n.block-1))*B
@@ -385,8 +434,96 @@ for (valid.block in 1:5) {
   n.valid=length(valid.ind)
   train.ind=setdiff(1:n,valid.ind)
   n.train=length(train.ind)
-  returnstd.train=returnstd[1:500,][train.ind,]
-  returnstd.valid=returnstd[1:500,][valid.ind,]
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  mu.train=rep(1,p)
+  mu.valid=rep(1,p)
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+  l.lambda=length(lambda.grid)
+  cv.l.error=NULL
+  cv.l=NULL
+  for(i in 1:l.lambda){
+    lmd=lambda.grid[i]
+    print(i)
+    lin.train=linfun1(cov.train,mu.train,lmd)
+    if(!(all(lin.train==0))){
+      error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      cv.l.error=c(cv.l.error,error)
+      cv.l=c(cv.l,lmd)
+    }
+  }
+  lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+}
+lmd.i
+lmd1.WS750=mean(lmd.i) # = 0.3592
+lmd1.WS750 = 0.3592
+lmd1=0.3592
+
+###### Task 3: window size 1000  ######
+
+# Use for recurrence
+window_size = 1000
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+lmd.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  mu.train=rep(1,p)
+  mu.valid=rep(1,p)
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+  l.lambda=length(lambda.grid)
+  cv.l.error=NULL
+  cv.l=NULL
+  for(i in 1:l.lambda){
+    lmd=lambda.grid[i]
+    print(i)
+    lin.train=linfun1(cov.train,mu.train,lmd)
+    if(!(all(lin.train==0))){
+      error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      cv.l.error=c(cv.l.error,error)
+      cv.l=c(cv.l,lmd)
+    }
+  }
+  lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+}
+lmd.i
+lmd1.WS1000=mean(lmd.i) # =0.2746
+lmd1=0.2746
+
+##### CV for tuning lambda in estimation Sigma^-1 mu, using the first 500/750/1000 data ######
+###### Task 1: window size 500  ######
+window_size = 500
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+lmd.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
   mu.train=colMeans(returnstd.train)
   mu.valid=colMeans(returnstd.valid)
   cov.train=cov(returnstd.train)
@@ -409,12 +546,13 @@ for (valid.block in 1:5) {
   lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
 }
 lmd.i
-lmd2=mean(lmd.i)
+lmd2.WS500=mean(lmd.i)
+lmd2.WS500=0.002142681
 lmd2=0.002142681
 
-
-###### CV for tuning lambda in estimation Sigma^-1 phi, using the first 500 data ######
-n<-dim(returnstd[1:500,])[1]
+###### Task 2: window size 750  ######
+window_size = 750
+n<-dim(returnstd[1:window_size,])[1]
 B=100
 n.block=floor(n/B)
 block.start=1+(0:(n.block-1))*B
@@ -428,8 +566,96 @@ for (valid.block in 1:5) {
   n.valid=length(valid.ind)
   train.ind=setdiff(1:n,valid.ind)
   n.train=length(train.ind)
-  returnstd.train=returnstd[1:500,][train.ind,]
-  returnstd.valid=returnstd[1:500,][valid.ind,]
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  mu.train=colMeans(returnstd.train)
+  mu.valid=colMeans(returnstd.valid)
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  lambda.grid=seq(min(max(abs(mu.train))/100,min(abs(mu.train))), 0.01,length=101)[2:100]
+  l.lambda=length(lambda.grid)
+  cv.l.error=NULL
+  cv.l=NULL
+  for(i in 1:l.lambda){
+    lmd=lambda.grid[i]
+    print(i)
+    lin.train=linfun1(cov.train,mu.train,lmd)
+    sum(lin.train==0)
+    if(!(all(lin.train==0))){
+      error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      cv.l.error=c(cv.l.error,error)
+      cv.l=c(cv.l,lmd)
+    }
+  }
+  lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+}
+lmd.i
+lmd2.WS750=mean(lmd.i) # = 0.001682136
+lmd2.WS750= 0.001682136
+lmd2=0.001682136
+
+###### Task 3: window size 1000  ######
+window_size = 1000
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+lmd.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  mu.train=colMeans(returnstd.train)
+  mu.valid=colMeans(returnstd.valid)
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  lambda.grid=seq(min(max(abs(mu.train))/100,min(abs(mu.train))), 0.01,length=101)[2:100]
+  l.lambda=length(lambda.grid)
+  cv.l.error=NULL
+  cv.l=NULL
+  for(i in 1:l.lambda){
+    lmd=lambda.grid[i]
+    print(i)
+    lin.train=linfun1(cov.train,mu.train,lmd)
+    sum(lin.train==0)
+    if(!(all(lin.train==0))){
+      error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      cv.l.error=c(cv.l.error,error)
+      cv.l=c(cv.l,lmd)
+    }
+  }
+  lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+}
+lmd.i
+lmd2.WS1000=mean(lmd.i) # =0.001122977
+lmd2=0.001122977
+
+##### CV for tuning lambda in estimation Sigma^-1 phi, using the first 500/750/1000 data ######
+###### Task 1: window size 500  ######
+window_size = 500
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+lmd.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
   cov.train=cov(returnstd.train)
   cov.valid=cov(returnstd.valid)
   mu.train=EC_DS[[1]]
@@ -459,11 +685,115 @@ for (valid.block in 1:5) {
   lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
 }
 lmd.i
-lmd3=mean(lmd.i)
+lmd3.WS500=mean(lmd.i)
+lmd3.WS500=0.4132
 lmd3=0.4132
 
-##### CV for tuning parameter in glasso #####
-n<-dim(returnstd[1:500,])[1]
+###### Task 2: window size 750  ######
+window_size = 750
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+lmd.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  mu.train=EC_DS[[1]]
+  mu.valid=EC_DS[[1]]
+  # mu.train=linfun3(cor(returnstd.train)-diag(1,p,p)-diag(max(eigen(cor(returnstd.train))$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(cor(returnstd.train)-diag(1,p,p)-diag(max(eigen(cor(returnstd.train))$value),p,p))$vector[1,1]))
+  # mu.train=mu.train/max(mu.train)
+  # sum(mu.train==0)
+  # mu.valid=linfun3(cor(returnstd.valid)-diag(1,p,p)-diag(max(eigen(cor(returnstd.valid))$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(cor(returnstd.valid)-diag(1,p,p)-diag(max(eigen(cor(returnstd.valid))$value),p,p))$vector[1,1]))
+  # mu.valid=mu.valid/max(mu.valid)
+  # sum(mu.valid==0)
+  lambda.grid=seq(0.1, max(mu.train),length=101)[1:100]
+  l.lambda=length(lambda.grid)
+  cv.l.error=NULL
+  cv.l=NULL
+  for(i in 1:l.lambda){
+    lmd=lambda.grid[i]
+    print(i)
+    # lmd=0.1
+    lin.train=linfun1(cov.train,mu.train,lmd)
+    # sum(lin.train==0)
+    if(!(all(lin.train==0))){
+      error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      cv.l.error=c(cv.l.error,error)
+      cv.l=c(cv.l,lmd)
+    }
+  }
+  lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+}
+lmd.i
+lmd3.WS750=mean(lmd.i) # =0.2782
+lmd3.WS750 =0.2782
+lmd3=0.2782
+
+###### Task 3: window size 1000  ######
+window_size = 1000
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+lmd.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  mu.train=EC_DS[[1]]
+  mu.valid=EC_DS[[1]]
+  # mu.train=linfun3(cor(returnstd.train)-diag(1,p,p)-diag(max(eigen(cor(returnstd.train))$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(cor(returnstd.train)-diag(1,p,p)-diag(max(eigen(cor(returnstd.train))$value),p,p))$vector[1,1]))
+  # mu.train=mu.train/max(mu.train)
+  # sum(mu.train==0)
+  # mu.valid=linfun3(cor(returnstd.valid)-diag(1,p,p)-diag(max(eigen(cor(returnstd.valid))$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(cor(returnstd.valid)-diag(1,p,p)-diag(max(eigen(cor(returnstd.valid))$value),p,p))$vector[1,1]))
+  # mu.valid=mu.valid/max(mu.valid)
+  # sum(mu.valid==0)
+  lambda.grid=seq(0.1, max(mu.train),length=101)[1:100]
+  l.lambda=length(lambda.grid)
+  cv.l.error=NULL
+  cv.l=NULL
+  for(i in 1:l.lambda){
+    lmd=lambda.grid[i]
+    print(i)
+    # lmd=0.1
+    lin.train=linfun1(cov.train,mu.train,lmd)
+    # sum(lin.train==0)
+    if(!(all(lin.train==0))){
+      error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      cv.l.error=c(cv.l.error,error)
+      cv.l=c(cv.l,lmd)
+    }
+  }
+  lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+}
+lmd.i
+lmd3.WS1000=mean(lmd.i) # =0.2656
+lmd3=0.2656
+
+##### CV for tuning parameter in glasso, using the first 500/750/1000 data #####
+###### Task 1: window size 500  ######
+window_size = 500
+n<-dim(returnstd[1:window_size,])[1]
 B=100
 n.block=floor(n/B)
 block.start=1+(0:(n.block-1))*B
@@ -477,8 +807,8 @@ for (valid.block in 1:5) {
   n.valid=length(valid.ind)
   train.ind=setdiff(1:n,valid.ind)
   n.train=length(train.ind)
-  returnstd.train=returnstd[1:500,][train.ind,]
-  returnstd.valid=returnstd[1:500,][valid.ind,]
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
   mu.train=colMeans(returnstd.train)
   mu.valid=colMeans(returnstd.valid)
   cov.train=cov(returnstd.train)
@@ -497,13 +827,122 @@ for (valid.block in 1:5) {
   }
   rho.i[valid.block]=cv.rho[which(cv.rho.error==min(cv.rho.error))]
 }
-rho=mean(rho.i)
+rho.WS500=mean(rho.i)
+rho.WS500=0.016
 rho<-0.016
 
-## Dantzig selector estimation for theta1, theta2, theta3 #####
+###### Task 2: window size 750  ######
+window_size = 750
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+rho.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  mu.train=colMeans(returnstd.train)
+  mu.valid=colMeans(returnstd.valid)
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  rho.grid=seq(0,0.8,length=101)[2:101]
+  l.rho=length(rho.grid)
+  cv.rho.error=NULL
+  cv.rho=NULL
+  for (i in 1:l.rho){
+    rho=rho.grid[i]
+    prec.glasso=glasso(cov.train,rho=rho)$wi
+    error=sum((prec.glasso%*%cov.valid-diag(rep(1,p)))^2)
+    cv.rho.error=c(cv.rho.error,error)
+    cv.rho=c(cv.rho,rho)
+    print(i)
+  }
+  rho.i[valid.block]=cv.rho[which(cv.rho.error==min(cv.rho.error))]
+}
+rho.WS750=mean(rho.i) # =0.016
+rho.WS750 =0.016
+rho<-0.016
+
+###### Task 3: window size 1000  ######
+window_size = 1000
+n<-dim(returnstd[1:window_size,])[1]
+B=100
+n.block=floor(n/B)
+block.start=1+(0:(n.block-1))*B
+# valid.block=sort(sample(1:n.block,floor(n.block/4)))
+rho.i=c()
+for (valid.block in 1:5) {
+  valid.ind=NULL
+  for(k in valid.block){
+    valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+  }
+  n.valid=length(valid.ind)
+  train.ind=setdiff(1:n,valid.ind)
+  n.train=length(train.ind)
+  returnstd.train=returnstd[1:window_size,][train.ind,]
+  returnstd.valid=returnstd[1:window_size,][valid.ind,]
+  mu.train=colMeans(returnstd.train)
+  mu.valid=colMeans(returnstd.valid)
+  cov.train=cov(returnstd.train)
+  cov.valid=cov(returnstd.valid)
+  rho.grid=seq(0,0.8,length=101)[2:101]
+  l.rho=length(rho.grid)
+  cv.rho.error=NULL
+  cv.rho=NULL
+  for (i in 1:l.rho){
+    rho=rho.grid[i]
+    prec.glasso=glasso(cov.train,rho=rho)$wi
+    error=sum((prec.glasso%*%cov.valid-diag(rep(1,p)))^2)
+    cv.rho.error=c(cv.rho.error,error)
+    cv.rho=c(cv.rho,rho)
+    print(i)
+  }
+  rho.i[valid.block]=cv.rho[which(cv.rho.error==min(cv.rho.error))]
+}
+rho.WS1000=mean(rho.i) # =0.016
+rho<-0.016
+
+###### Save tuned parameters in glasso  ######
+
+save(rho.WS500,rho.WS750,rho.WS1000,file="Glasso_rho.RData")
+
+## Dantzig selector estimation for theta1, theta2, theta3, for window size 500/750/1000 #####
 # theta1 <- Sigma^-1 1
 # theta2 <- Sigma^-1 mu
 # theta3 <- Sigma^-1 phi
+
+###### Task 1: window size 500  ######
+W<-list()
+window_size = 500
+for(t in 0: (floor((1857-window_size)/22)-1)){
+  W[[(t+1)]]=returnstd[(1+t*22):(window_size+22+t*22),]
+}
+W_in<-list()
+W_out<-list()
+for(t in 0: (floor((1857-window_size)/22)-1)){
+  W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+  W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+}
+T.windows<-length(W)
+load("eigenvector_centrality_WS500_20240723.RData")
+EC_in=eigenvector_centrality$eigenvector_absolute_value
+EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
+ER_in=eigenvector_centrality$expected_return
+C_in=eigenvector_centrality$correlation_matrix
+COV_in=eigenvector_centrality$covariance_matrix
+
+lmd1.WS500=0.4636
+lmd2.WS500=0.002142681
+lmd3.WS500=0.4132
+
 theta1<-list()
 theta2<-list()
 theta3<-list()
@@ -511,903 +950,113 @@ for(t in 1: length(W_in)){
   print(t)
   ptm<-proc.time()
   ## compute global minimum variance portfolio ##
-  theta1[[t]] =linfun1(COV_in[[t]],rep(1,p),lambda=lmd1) # lambda <= 0.1 will lead to be infeasible
+  theta1[[t]] =linfun1(COV_in[[t]],rep(1,p),lambda=lmd1.WS500) # lambda <= 0.1 will lead to be infeasible
   # print('theta1')
-  theta2[[t]] =linfun1(COV_in[[t]],ER_in[[t]],lambda=lmd2) # lambda <= 0.1 will lead to be infeasible
+  theta2[[t]] =linfun1(COV_in[[t]],ER_in[[t]],lambda=lmd2.WS500) # lambda <= 0.1 will lead to be infeasible
   # print('theta2')
-  theta3[[t]] =linfun1(COV_in[[t]],EC_DS[[t]],lambda=lmd3) # lambda <= 0.1 will lead to be infeasible
+  theta3[[t]] =linfun1(COV_in[[t]],EC_DS[[t]],lambda=lmd3.WS500) # lambda <= 0.1 will lead to be infeasible
   ptm<-proc.time()-ptm
   print(ptm)
 }
 theta<-list("theta1"=theta1,
             "theta2"=theta2,
             "theta3"=theta3)
-save(theta,file="theta_Dantzig_20230513.RData")
-load("theta_Dantzig_20230513.RData")
+save(theta,file="theta_Dantzig_WS500_20240723.RData")
+load("theta_Dantzig_WS500_20240723.RData")
+theta1=theta$theta1
+theta2=theta$theta2
+theta3=theta$theta3
+
+###### Task 2: window size 750  ######
+W<-list()
+window_size = 750
+for(t in 0: (floor((1857-window_size)/22)-1)){
+  W[[(t+1)]]=returnstd[(1+t*22):(window_size+22+t*22),]
+}
+W_in<-list()
+W_out<-list()
+for(t in 0: (floor((1857-window_size)/22)-1)){
+  W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+  W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+}
+T.windows<-length(W)
+load("eigenvector_centrality_WS750_20240723.RData")
+EC_in=eigenvector_centrality$eigenvector_absolute_value
+EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
+ER_in=eigenvector_centrality$expected_return
+C_in=eigenvector_centrality$correlation_matrix
+COV_in=eigenvector_centrality$covariance_matrix
+
+lmd1.WS750 = 0.3592
+lmd2.WS750= 0.001682136
+lmd3.WS750 =0.2782
+
+theta1<-list()
+theta2<-list()
+theta3<-list()
+for(t in 1: length(W_in)){
+  print(t)
+  ptm<-proc.time()
+  ## compute global minimum variance portfolio ##
+  theta1[[t]] =linfun1(COV_in[[t]],rep(1,p),lambda=lmd1.WS750) # lambda <= 0.1 will lead to be infeasible
+  # print('theta1')
+  theta2[[t]] =linfun1(COV_in[[t]],ER_in[[t]],lambda=lmd2.WS750) # lambda <= 0.1 will lead to be infeasible
+  # print('theta2')
+  theta3[[t]] =linfun1(COV_in[[t]],EC_DS[[t]],lambda=lmd3.WS750) # lambda <= 0.1 will lead to be infeasible
+  ptm<-proc.time()-ptm
+  print(ptm)
+}
+theta<-list("theta1"=theta1,
+            "theta2"=theta2,
+            "theta3"=theta3)
+save(theta,file="theta_Dantzig_WS750_20240723.RData")
+load("theta_Dantzig_WS750_20240723.RData")
+theta1=theta$theta1
+theta2=theta$theta2
+theta3=theta$theta3
+
+###### Task 3: window size 1000  ######
+W<-list()
+window_size = 1000
+for(t in 0: (floor((1857-window_size)/22)-1)){
+  W[[(t+1)]]=returnstd[(1+t*22):(window_size+22+t*22),]
+}
+W_in<-list()
+W_out<-list()
+for(t in 0: (floor((1857-window_size)/22)-1)){
+  W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+  W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+}
+T.windows<-length(W)
+load("eigenvector_centrality_WS1000_20240723.RData")
+EC_in=eigenvector_centrality$eigenvector_absolute_value
+EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
+ER_in=eigenvector_centrality$expected_return
+C_in=eigenvector_centrality$correlation_matrix
+COV_in=eigenvector_centrality$covariance_matrix
+
+theta1<-list()
+theta2<-list()
+theta3<-list()
+for(t in 1: length(W_in)){
+  print(t)
+  ptm<-proc.time()
+  ## compute global minimum variance portfolio ##
+  theta1[[t]] =linfun1(COV_in[[t]],rep(1,p),lambda=lmd1.WS1000) # lambda <= 0.1 will lead to be infeasible
+  # print('theta1')
+  theta2[[t]] =linfun1(COV_in[[t]],ER_in[[t]],lambda=lmd2.WS1000) # lambda <= 0.1 will lead to be infeasible
+  # print('theta2')
+  theta3[[t]] =linfun1(COV_in[[t]],EC_DS[[t]],lambda=lmd3.WS1000) # lambda <= 0.1 will lead to be infeasible
+  ptm<-proc.time()-ptm
+  print(ptm)
+}
+theta<-list("theta1"=theta1,
+            "theta2"=theta2,
+            "theta3"=theta3)
+save(theta,file="theta_Dantzig_WS1000_20240723.RData")
+load("theta_Dantzig_WS1000_20240723.RData")
 theta1=theta$theta1
 theta2=theta$theta2
 theta3=theta$theta3
 
 
-#### Weights of different portfolios in each rolling window ####
-##### minimum variance portfolio  #####
-
-###### minimum variance portfolio with Dantzig estimation  ######
-w<-list()
-cumureturn_minVar_Dantzig<-list()
-for(t in 1: length(W_in)){
-  w[[t]]=theta1[[t]]/sum(theta1[[t]])
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_minVar_Dantzig[[t]]<-rowSums(aus)
-}
-return_minVar_Dantzig<-as.matrix(cbind(unlist(cumureturn_minVar_Dantzig))+1)
-cumureturn_minVar_Dantzig<-cumprod(return_minVar_Dantzig)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_minVar_Dantzig<-w
-
-###### minimum variance portfolio with plug in  ######
-w<-list()
-cumureturn_minVar<-list()
-for(t in 1: length(W_in)){
-  portf_minVar =globalMin.portfolio(ER_in[[(t)]],COV_in[[(t)]])
-  w[[(t)]] =portf_minVar$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_minVar[[t]]<-rowSums(aus)
-}
-return_minVar<-as.matrix(cbind(unlist(cumureturn_minVar))+1)
-cumureturn_minVar<-cumprod(return_minVar)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_minVar<-w
-
-##### minimum variance portfolio with glasso #####
-w<-list()
-cumureturn<-list()
-for(t in 1: length(W_in)){
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-  w[[t]]=row_sums(glasso.icov)/sum(glasso.icov)
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn[[t]]<-rowSums(aus)
-}
-return_minVar_glasso<-as.matrix(cbind(unlist(cumureturn))+1)
-cumureturn_minVar_glasso<-cumprod(return_minVar_glasso)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_minVar_glasso<-w
-
-###### minimum variance portfolio with plug in no short ######
-w<-list()
-cumureturn_minVar_noshort<-list()
-for(t in 1: length(W_in)){
-  portf_minVar =globalMin.portfolio(ER_in[[(t)]],COV_in[[(t)]],FALSE)
-  w[[(t)]] =portf_minVar$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_minVar_noshort[[t]]<-rowSums(aus)
-}
-return_minVar_noshort<-as.matrix(cbind(unlist(cumureturn_minVar_noshort))+1)
-cumureturn_minVar_noshort<-cumprod(return_minVar_noshort)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_minVar_noshort<-w
-
-##### mean variance portfolio  #####
-###### mean variance portfolio with plug in  ######
-w<-list()
-cumureturn_meanVar<-list()
-for(t in 1: length(W_in)){
-  portf_meanVar =efficient.portfolio(ER_in[[(t)]],COV_in[[(t)]],mean(ER_in[[t]]))
-  w[[(t)]] =portf_meanVar$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_meanVar[[t]]<-rowSums(aus)
-}
-return_meanVar<-as.matrix(cbind(unlist(cumureturn_meanVar))+1)
-cumureturn_meanVar<-cumprod(return_meanVar)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_meanVar<-w
-
-###### mean variance portfolio with Dantzig estimation  ######
-w<-list()
-cumureturn_meanVar_Dantzig<-list()
-for(t in 1: length(W_in)){
-  alpha=(sum(theta2[[t]])*sum(theta1[[t]])*mean(ER_in[[t]])-(sum(theta2[[t]]))^2)/(ER_in[[(t)]]%*%theta2[[t]]*sum(theta1[[t]])-(sum(theta2[[t]]))^2)
-  w[[(t)]] = alpha*theta2[[t]]/sum(theta2[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_meanVar_Dantzig[[t]]<-rowSums(aus)
-}
-return_meanVar_Dantzig<-as.matrix(cbind(unlist(cumureturn_meanVar_Dantzig))+1)
-cumureturn_meanVar_Dantzig<-cumprod(return_meanVar_Dantzig)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_meanVar_Dantzig<-w
-
-###### mean variance portfolio with glasso ######
-w<-list()
-cumureturn<-list()
-for(t in 1: length(W_in)){
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-  alpha=(sum(glasso.icov%*%ER_in[[t]])*sum(glasso.icov)*mean(ER_in[[t]])-(sum(glasso.icov%*%ER_in[[t]]))^2)/(ER_in[[(t)]]%*%glasso.icov%*%ER_in[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%ER_in[[t]]))^2)
-  w[[(t)]] = c(alpha[1]*glasso.icov%*%ER_in[[t]]/sum(glasso.icov%*%ER_in[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn[[t]]<-rowSums(aus)
-}
-return_meanVar_glasso<-as.matrix(cbind(unlist(cumureturn))+1)
-cumureturn_meanVar_glasso<-cumprod(return_meanVar_glasso)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_meanVar_glasso<-w
-
-###### mean variance portfolio with plug in no short ######
-w<-list()
-cumureturn_meanVar_noshort<-list()
-for(t in 1: length(W_in)){
-  portf_meanVar =efficient.portfolio(ER_in[[(t)]],COV_in[[(t)]],mean(ER_in[[t]]),shorts = FALSE)
-  w[[(t)]] =portf_meanVar$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_meanVar_noshort[[t]]<-rowSums(aus)
-}
-return_meanVar_noshort<-as.matrix(cbind(unlist(cumureturn_meanVar_noshort))+1)
-cumureturn_meanVar_noshort<-cumprod(return_meanVar_noshort)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_meanVar_noshort<-w
-##### equally weighted portfolio #####
-w<-list()
-cumureturn_temporal<-list()
-centrality_equal_portfolio<-list()
-for(t in 1: length(W_in)){
-  w[[(t)]] =matrix(1/p,1,p)
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-  centrality_equal_portfolio[[t]]<-as.double(w[[(t)]]%*%EC_in[[(t)]])
-}
-return_equal<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_equal<-cumprod(return_equal)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_equal<-w
-
-##### network portfolio  constraint #####
-### default setting centrality constraint as mean centrality ###
-###### network portfolio fixed constraint as mean centrality with plug in ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio without short ##
-  net.gmin.port = network.efficient.portfolio(EC_DS[[(t)]], COV_in[[(t)]],mean(EC_DS[[(t)]]))
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_2constraint<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_2constraint<-cumprod(return_network_2constraint)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_2constraint<-w
-
-###### network portfolio fixed constraint as mean centrality with Dantzig ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio without short ##
-  if(c(theta1[[t]]/sum(theta1[[t]]))%*%c(EC_DS[[(t)]])>mean(EC_DS[[t]])){
-    alpha=(sum(theta3[[t]])*sum(theta1[[t]])*mean(EC_DS[[t]])-(sum(theta3[[t]]))^2)/(EC_DS[[(t)]]%*%theta3[[t]]*sum(theta1[[t]])-(sum(theta3[[t]]))^2)
-    w[[(t)]] = c(alpha)*theta3[[t]]/sum(theta3[[t]])+(1-c(alpha))*theta1[[t]]/sum(theta1[[t]])
-  }
-  else{
-    w[[(t)]] = theta1[[t]]/sum(theta1[[t]])
-  }
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_2constraint_Dantzig<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_2constraint_Dantzig<-cumprod(return_network_2constraint_Dantzig)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_2constraint_Dantzig<-w
-
-###### network portfolio fixed constraint as mean centrality with glasso ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio without short ##
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-  if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[t]])>mean(EC_DS[[t]])){
-    alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*mean(EC_DS[[t]])-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
-    w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-  }
-  else{
-    w[[(t)]] = row_sums(glasso.icov)/sum(glasso.icov)
-  }
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_2constraint_glasso<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_2constraint_glasso<-cumprod(return_network_2constraint_glasso)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_2constraint_glasso<-w
-
-###### network portfolio fixed constraint as mean centrality with plug in no short ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio without short ##
-  net.gmin.port = network.efficient.portfolio(EC_DS[[(t)]], COV_in[[(t)]],mean(EC_DS[[(t)]]),FALSE)
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-  # print(t)
-}
-return_network_2constraint_noshort<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_2constraint_noshort<-cumprod(return_network_2constraint_noshort)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_2constraint_noshort<-w
-
-###### network portfolio varying constraint with plug in ######
-cumureturn_network_vary_with_phi<-list()
-return_network_vary_with_phi<-list()
-quantl<-seq(0.1,0.9,0.1)
-w_network_vary_with_phi<-list()
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## compute 1-constraint network portfolio ##
-    net.gmin.port = network.efficient.portfolio(EC_DS[[(t)]], COV_in[[(t)]],quantile(EC_DS[[(t)]],quantl[i]),TRUE)
-    w[[(t)]] =net.gmin.port$weights
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi[[i]]<-cumprod(return_network_vary_with_phi[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi[[i]]<-w
-}
-
-###### network portfolio varying constraint with Dantzig ######
-cumureturn_network_vary_with_phi_Dantzig<-list()
-return_network_vary_with_phi_Dantzig<-list()
-quantl<-seq(0.1,0.9,0.1)
-w_network_vary_with_phi_Dantzig<-list()
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    if((c(theta1[[t]]/sum(theta1[[t]]))%*%c(EC_DS[[(t)]]))>quantile(EC_DS[[(t)]],quantl[i])){
-      alpha=c((sum(theta3[[t]])*sum(theta1[[t]])*quantile(EC_DS[[(t)]],quantl[i])-(sum(theta3[[t]]))^2)/(EC_DS[[(t)]]%*%theta3[[t]]*sum(theta1[[t]])-(sum(theta3[[t]]))^2))
-      w[[(t)]] = alpha*theta3[[t]]/sum(theta3[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-    }
-    else{
-      w[[(t)]] = theta1[[t]]/sum(theta1[[t]])
-    }
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_Dantzig[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_Dantzig[[i]]<-cumprod(return_network_vary_with_phi_Dantzig[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_Dantzig[[i]]<-w
-}
-
-###### network portfolio varying constraint with glasso ######
-cumureturn_network_vary_with_phi_glasso<-list()
-return_network_vary_with_phi_glasso<-list()
-quantl<-seq(0.1,0.9,0.1)
-w_network_vary_with_phi_glasso<-list()
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## compute global minimum variance portfolio ##glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-    glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-    if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[t]]))>quantile(EC_DS[[(t)]],quantl[i])){
-      alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*quantile(EC_DS[[(t)]],quantl[i])-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
-      w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-    }
-    else{
-      w[[(t)]] = row_sums(glasso.icov)/sum(glasso.icov)
-    }
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_glasso[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_glasso[[i]]<-cumprod(return_network_vary_with_phi_glasso[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_glasso[[i]]<-w
-}
-
-###### network portfolio varying constraint with plug in no short ######
-cumureturn_network_vary_with_phi_noshort<-list()
-return_network_vary_with_phi_noshort<-list()
-w_network_vary_with_phi_noshort<-list()
-quantl<-seq(0.1,0.9,0.1)
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## compute global minimum variance portfolio ##
-    net.gmin.port = network.efficient.portfolio(EC_DS[[(t)]], COV_in[[(t)]],quantile(EC_DS[[(t)]],quantl[i]),FALSE)
-    w[[(t)]] =net.gmin.port$weights
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_noshort[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_noshort[[i]]<-cumprod(return_network_vary_with_phi_noshort[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_noshort[[i]]<-w
-}
-###### network portfolio data-driven constraint with plug in ######
-cumureturn_network_datadriven_phistar<-list()
-return_network_datadriven_phistar<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  net.gmin.port = network.efficient.portfolio(EC_DS[[(t)]], COV_in[[(t)]],phi_star[[t]],TRUE)
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_datadriven_phistar<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar<-cumprod(return_network_datadriven_phistar)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar<-w
-
-###### network portfolio data-driven constraint with Dantzig ######
-cumureturn_network_datadriven_phistar_Dantzig<-list()
-return_network_datadriven_phistar_Dantzig<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  if(c(theta1[[t]]/sum(theta1[[t]]))%*%c(EC_DS[[(t)]])>phi_star[[t]]){
-    alpha=c((sum(theta3[[t]])*sum(theta1[[t]])*phi_star[[t]]-(sum(theta3[[t]]))^2)/(EC_DS[[(t)]]%*%theta3[[t]]*sum(theta1[[t]])-(sum(theta3[[t]]))^2))
-    w[[(t)]] = alpha*theta3[[t]]/sum(theta3[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-  }
-  else{
-    w[[(t)]] = theta1[[t]]/sum(theta1[[t]])
-  }
-  aus <- as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]] <- rowSums(aus)
-}
-return_network_datadriven_phistar_Dantzig<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_Dantzig<-cumprod(return_network_datadriven_phistar_Dantzig)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_Dantzig<-w
-
-###### network portfolio data-driven constraint with glasso ######
-cumureturn_network_datadriven_phistar_glasso<-list()
-return_network_datadriven_phistar_glasso<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-  if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[t]])>phi_star[[t]]){
-    alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*phi_star[[t]]-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
-    w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-  }
-  else{
-    w[[(t)]] = row_sums(glasso.icov)/sum(glasso.icov)
-  }
-  aus <- as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]] <- rowSums(aus)
-}
-return_network_datadriven_phistar_glasso<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_glasso<-cumprod(return_network_datadriven_phistar_glasso)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_glasso<-w
-
-###### network portfolio data-driven constraint with plug in no short ######
-cumureturn_network_datadriven_phistar_noshort<-list()
-return_network_datadriven_phistar_noshort<-list()
-cumureturn_temporal<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-for(t in 1: length(W_in)){
-  ## compute network portfolio data-driven constraint no short ##
-  net.gmin.port = network.efficient.portfolio(EC_DS[[(t)]], COV_in[[(t)]],phi_star[[t]],FALSE)
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_datadriven_phistar_noshort<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_noshort<-cumprod(return_network_datadriven_phistar_noshort)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_noshort<-w
-
-##### network portfolio 3 constraint #####
-### default setting centrality constraint as mean centrality ###
-
-###### network portfolio fixed constraint with plug in ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute 3 constraint network portfolio ##
-  net.gmin.port = network.3constraint.portfolio(EC_DS[[(t)]],ER_in[[(t)]], COV_in[[(t)]],mean(EC_DS[[(t)]]),mean(ER_in[[(t)]]))
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_3constraint<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_3constraint<-cumprod(return_network_3constraint)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_3constraint<-w
-
-###### network portfolio fixed constraint with Dantzig ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute 3 constraint network portfolio ##
-  if(c(theta1[[t]]/sum(theta1[[t]]))%*%c(EC_DS[[(t)]])>mean(EC_DS[[t]])){
-    if(c(theta1[[t]]/sum(theta1[[t]]))%*%c(ER_in[[(t)]])<mean(ER_in[[t]])){
-      # 3 constraint case
-      M1 <- cbind(rbind(1,mean(EC_DS[[(t)]]),mean(ER_in[[(t)]])),
-                  rbind(sum(theta3[[(t)]]),EC_DS[[(t)]]%*%theta3[[(t)]],ER_in[[(t)]]%*%theta3[[(t)]]),
-                  rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-      M2 <- cbind(rbind(sum(theta1[[(t)]]),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                  rbind(1,mean(EC_DS[[(t)]]),mean(ER_in[[(t)]])),
-                  rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-      M <- cbind(rbind(sum(theta1[[(t)]]),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                 rbind(sum(theta3[[(t)]]),EC_DS[[(t)]]%*%theta3[[(t)]],ER_in[[(t)]]%*%theta3[[(t)]]),
-                 rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-      gamma1 <- det(M1)/det(M)
-      gamma2 <- det(M2)/det(M)
-      alpha1 <- c(gamma1*sum(theta3[[t]]))
-      alpha2 <- c(gamma2*sum(theta2[[t]]))
-      w1 <- (1-alpha1-alpha2)*theta1[[t]]/sum(theta1[[t]])
-      w2 <- alpha1*theta3[[t]]/sum(theta3[[t]])
-      w3 <- alpha2*theta2[[t]]/sum(theta2[[t]])
-      w[[(t)]] = w1 +  w2 + w3
-    }
-    else{
-      # 1 centrality constraint case
-      alpha=(sum(theta3[[t]])*sum(theta1[[t]])*mean(EC_DS[[t]])-(sum(theta3[[t]]))^2)/(EC_DS[[(t)]]%*%theta3[[t]]*sum(theta1[[t]])-(sum(theta3[[t]]))^2)
-      w[[(t)]] = alpha*theta3[[t]]/sum(theta3[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-    }}
-  else{
-    if(c(theta1[[t]]/sum(theta1[[t]]))%*%c(ER_in[[(t)]])<mean(ER_in[[t]])){
-      # 1 expected return constraint case 
-      alpha=c((sum(theta2[[t]])*sum(theta1[[t]])*mean(ER_in[[t]])-(sum(theta2[[t]]))^2)/(ER_in[[(t)]]%*%theta2[[t]]*sum(theta1[[t]])-(sum(theta2[[t]]))^2))
-      w[[(t)]] = alpha*theta2[[t]]/sum(theta2[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-    }
-    else{
-      # global minimum variance case 
-      w[[(t)]] = theta1[[t]]/sum(theta1[[t]])
-    }
-  }
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_3constraint_Dantzig<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_3constraint_Dantzig<-cumprod(return_network_3constraint_Dantzig)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_3constraint_Dantzig<-w
-
-###### network portfolio fixed constraint with glasso ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute 3 constraint network portfolio ##
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-  if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[(t)]])>mean(EC_DS[[t]])){
-    if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(ER_in[[(t)]])<mean(ER_in[[t]])){
-      # 3 constraint case
-      M1 <- cbind(rbind(1,mean(EC_DS[[(t)]]),mean(ER_in[[(t)]])),
-                  rbind(sum(glasso.icov%*%EC_DS[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]]),
-                  rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-      M2 <- cbind(rbind(sum(glasso.icov),EC_DS[[(t)]]%*%row_sums(glasso.icov),ER_in[[(t)]]%*%row_sums(glasso.icov)),
-                  rbind(1,mean(EC_DS[[(t)]]),mean(ER_in[[(t)]])),
-                  rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-      M <- cbind(rbind(sum(glasso.icov),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                 rbind(sum(glasso.icov%*%EC_DS[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]]),
-                 rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-      gamma1 <- det(M1)/det(M)
-      gamma2 <- det(M2)/det(M)
-      alpha1 <- c(gamma1*sum(glasso.icov%*%EC_DS[[(t)]]))
-      alpha2 <- c(gamma2*sum(glasso.icov%*%ER_in[[(t)]]))
-      w1 <- (1-alpha1-alpha2)*row_sums(glasso.icov)/sum(glasso.icov)
-      w2 <- alpha1*glasso.icov%*%EC_DS[[(t)]]/sum(glasso.icov%*%EC_DS[[(t)]])
-      w3 <- alpha2*glasso.icov%*%ER_in[[(t)]]/sum(glasso.icov%*%ER_in[[(t)]])
-      w[[(t)]] = c(w1 +  w2 + w3)
-    }
-    else{
-      # 1 centrality constraint case
-      alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*mean(EC_DS[[t]])-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
-      w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-    }}
-  else{
-    if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(ER_in[[(t)]])<mean(ER_in[[t]])){
-      # 1 expected return constraint case 
-      alpha=c((sum(glasso.icov%*%ER_in[[t]])*sum(glasso.icov)*mean(ER_in[[t]])-(sum(glasso.icov%*%ER_in[[t]]))^2)/(ER_in[[(t)]]%*%glasso.icov%*%ER_in[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%ER_in[[t]]))^2))
-      w[[(t)]] = c(alpha[1]*glasso.icov%*%ER_in[[t]]/sum(glasso.icov%*%ER_in[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-    }
-    else{
-      # global minimum variance case 
-      w[[t]]=row_sums(glasso.icov)/sum(glasso.icov)
-    }
-  }
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_3constraint_glasso<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_3constraint_glasso<-cumprod(return_network_3constraint_glasso)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_3constraint_glasso<-w
-
-###### network portfolio fixed constraint with plug in no short ######
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio without short ##
-  net.gmin.port = network.3constraint.portfolio(EC_DS[[(t)]],ER_in[[t]], COV_in[[(t)]],mean(EC_DS[[(t)]]),mean(ER_in[[t]]),FALSE)
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_3constraint_noshort<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_3constraint_noshort<-cumprod(return_network_3constraint_noshort)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_3constraint_noshort<-w
-###### network portfolio varying constraint with plug in ######
-cumureturn_network_vary_with_phi_3constraint<-list()
-return_network_vary_with_phi_3constraint<-list()
-w_network_vary_with_phi_3constraint<-list()
-quantl<-seq(0.1,0.9,0.1)
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## compute global minimum variance portfolio ##
-    net.gmin.port = network.3constraint.portfolio(EC_DS[[(t)]],ER_in[[t]], COV_in[[(t)]],quantile(EC_DS[[(t)]],quantl[i]),mean(ER_in[[t]]),TRUE)
-    w[[(t)]] =net.gmin.port$weights
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_3constraint[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_3constraint[[i]]<-cumprod(return_network_vary_with_phi_3constraint[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_3constraint[[i]]<-w
-}
-
-###### network portfolio varying constraint with Dantzig ######
-cumureturn_network_vary_with_phi_3constraint_Dantzig<-list()
-return_network_vary_with_phi_3constraint_Dantzig<-list()
-w_network_vary_with_phi_3constraint_Dantzig<-list()
-quantl<-seq(0.1,0.9,0.1)
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## network portfolio varying constraint with Dantzig estimation ##
-    if((c(theta1[[t]]/sum(theta1[[t]]))%*%c(EC_DS[[(t)]]))>quantile(EC_DS[[(t)]],quantl[i])){
-      if((c(theta1[[t]]/sum(theta1[[t]]))%*%c(ER_in[[(t)]]))<mean(ER_in[[t]])){
-        # 3 constraint case
-        M1 <- cbind(rbind(1,quantile(EC_DS[[(t)]],quantl[i]),mean(ER_in[[(t)]])),
-                    rbind(sum(theta3[[(t)]]),EC_DS[[(t)]]%*%theta3[[(t)]],ER_in[[(t)]]%*%theta3[[(t)]]),
-                    rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-        M2 <- cbind(rbind(sum(theta1[[(t)]]),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                    rbind(1,quantile(EC_DS[[(t)]],quantl[i]),mean(ER_in[[(t)]])),
-                    rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-        M <- cbind(rbind(sum(theta1[[(t)]]),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                   rbind(sum(theta3[[(t)]]),EC_DS[[(t)]]%*%theta3[[(t)]],ER_in[[(t)]]%*%theta3[[(t)]]),
-                   rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-        gamma1 <- det(M1)/det(M)
-        gamma2 <- det(M2)/det(M)
-        alpha1 <- c(gamma1*sum(theta3[[t]]))
-        alpha2 <- c(gamma2*sum(theta2[[t]]))
-        w1 <- (1-alpha1-alpha2)*theta1[[t]]/sum(theta1[[t]])
-        w2 <- alpha1*theta3[[t]]/sum(theta3[[t]])
-        w3 <- alpha2*theta2[[t]]/sum(theta2[[t]])
-        w[[(t)]] = w1 +  w2 + w3
-      }
-      else{
-        # 1 centrality constraint case
-        alpha=c((sum(theta3[[t]])*sum(theta1[[t]])*quantile(EC_DS[[(t)]],quantl[i])-(sum(theta3[[t]]))^2)/(EC_DS[[(t)]]%*%theta3[[t]]*sum(theta1[[t]])-(sum(theta3[[t]]))^2))
-        w[[(t)]] = alpha*theta3[[t]]/sum(theta3[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-      }}
-    else{
-      if((c(theta1[[t]]/sum(theta1[[t]]))%*%c(ER_in[[(t)]]))<mean(ER_in[[t]])){
-        # 1 expected return constraint case 
-        alpha=c((sum(theta2[[t]])*sum(theta1[[t]])*mean(ER_in[[t]])-(sum(theta2[[t]]))^2)/(ER_in[[(t)]]%*%theta2[[t]]*sum(theta1[[t]])-(sum(theta2[[t]]))^2))
-        w[[(t)]] = alpha*theta2[[t]]/sum(theta2[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-      }
-      else{
-        # global minimum variance case 
-        w[[(t)]] = theta1[[t]]/sum(theta1[[t]])
-      }
-    }
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_3constraint_Dantzig[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_3constraint_Dantzig[[i]]<-cumprod(return_network_vary_with_phi_3constraint_Dantzig[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_3constraint_Dantzig[[i]]<-w
-}
-
-###### network portfolio varying constraint with glasso ######
-cumureturn_network_vary_with_phi_3constraint_glasso<-list()
-return_network_vary_with_phi_3constraint_glasso<-list()
-w_network_vary_with_phi_3constraint_glasso<-list()
-quantl<-seq(0.1,0.9,0.1)
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## network portfolio varying constraint with glasso estimation ##
-    glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-    if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[(t)]]))>quantile(EC_DS[[(t)]],quantl[i])){
-      if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(ER_in[[(t)]]))<mean(ER_in[[t]])){
-        # 3 constraint case
-        M1 <- cbind(rbind(1,quantile(EC_DS[[(t)]],quantl[i]),mean(ER_in[[(t)]])),
-                    rbind(sum(glasso.icov%*%EC_DS[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]]),
-                    rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-        M2 <- cbind(rbind(sum(glasso.icov),EC_DS[[(t)]]%*%row_sums(glasso.icov),ER_in[[(t)]]%*%row_sums(glasso.icov)),
-                    rbind(1,quantile(EC_DS[[(t)]],quantl[i]),mean(ER_in[[(t)]])),
-                    rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-        M <- cbind(rbind(sum(glasso.icov),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                   rbind(sum(glasso.icov%*%EC_DS[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]]),
-                   rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-        gamma1 <- det(M1)/det(M)
-        gamma2 <- det(M2)/det(M)
-        alpha1 <- c(gamma1*sum(glasso.icov%*%EC_DS[[(t)]]))
-        alpha2 <- c(gamma2*sum(glasso.icov%*%ER_in[[(t)]]))
-        w1 <- (1-alpha1-alpha2)*row_sums(glasso.icov)/sum(glasso.icov)
-        w2 <- alpha1*glasso.icov%*%EC_DS[[(t)]]/sum(glasso.icov%*%EC_DS[[(t)]])
-        w3 <- alpha2*glasso.icov%*%ER_in[[(t)]]/sum(glasso.icov%*%ER_in[[(t)]])
-        w[[(t)]] = c(w1 +  w2 + w3)
-      }
-      else{
-        # 1 centrality constraint case
-        alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*quantile(EC_DS[[(t)]],quantl[i])-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
-        w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-      }}
-    else{
-      if(((row_sums(glasso.icov)/sum(glasso.icov))%*%ER_in[[(t)]])<mean(ER_in[[t]])){
-        # 1 expected return constraint case 
-        alpha=c((sum(glasso.icov%*%ER_in[[t]])*sum(glasso.icov)*mean(ER_in[[t]])-(sum(glasso.icov%*%ER_in[[t]]))^2)/(ER_in[[(t)]]%*%glasso.icov%*%ER_in[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%ER_in[[t]]))^2))
-        w[[(t)]] = c(alpha[1]*glasso.icov%*%ER_in[[t]]/sum(glasso.icov%*%ER_in[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-      }
-      else{
-        # global minimum variance case 
-        w[[t]]=row_sums(glasso.icov)/sum(glasso.icov)
-      }
-    }
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_3constraint_glasso[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_3constraint_glasso[[i]]<-cumprod(return_network_vary_with_phi_3constraint_glasso[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_3constraint_glasso[[i]]<-w
-}
-
-###### network portfolio varying constraint with plug in no short ######
-cumureturn_network_vary_with_phi_3constraint_noshort<-list()
-return_network_vary_with_phi_3constraint_noshort<-list()
-w_network_vary_with_phi_3constraint_noshort<-list()
-quantl<-seq(0.1,0.9,0.1)
-for (i in 1:length(quantl)) {
-  w<-list()
-  cumureturn_temporal<-list()
-  for(t in 1: length(W_in)){
-    ## compute global minimum variance portfolio ##
-    net.gmin.port = network.3constraint.portfolio(EC_DS[[(t)]],ER_in[[t]], COV_in[[(t)]],quantile(EC_DS[[(t)]],quantl[i]),mean(ER_in[[t]]),FALSE)
-    w[[(t)]] =net.gmin.port$weights
-    aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-    cumureturn_temporal[[t]]<-rowSums(aus)
-  }
-  return_network_vary_with_phi_3constraint_noshort[[i]]<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-  cumureturn_network_vary_with_phi_3constraint_noshort[[i]]<-cumprod(return_network_vary_with_phi_3constraint_noshort[[i]])
-  w<-t(matrix(unlist(w),p,T.windows))
-  colnames(w) = node.label
-  w_network_vary_with_phi_3constraint_noshort[[i]]<-w
-}
-
-###### network portfolio varying constraint with glasso no short ######
-
-###### network portfolio data-driven constraint with plug in ######
-cumureturn_network_datadriven_phistar_3constraint<-list()
-return_network_datadriven_phistar_3constraint<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  net.gmin.port = network.3constraint.portfolio(EC_DS[[(t)]],ER_in[[t]], COV_in[[(t)]],phi_star[[t]],mean(ER_in[[t]]),TRUE)
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_datadriven_phistar_3constraint<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_3constraint<-cumprod(return_network_datadriven_phistar_3constraint)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_3constraint<-w
-
-###### network portfolio data-driven constraint with Dantzig ######
-cumureturn_network_datadriven_phistar_3constraint_Dantzig<-list()
-return_network_datadriven_phistar_3constraint_Dantzig<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  if((c(theta1[[t]]/sum(theta1[[t]]))%*%c(EC_DS[[(t)]]))>phi_star[[t]]){
-    if((c(theta1[[t]]/sum(theta1[[t]]))%*%c(ER_in[[(t)]]))<phi_star[[t]]){
-      # 3 constraint case
-      M1 <- cbind(rbind(1,phi_star[[t]],mean(ER_in[[(t)]])),
-                  rbind(sum(theta3[[(t)]]),EC_DS[[(t)]]%*%theta3[[(t)]],ER_in[[(t)]]%*%theta3[[(t)]]),
-                  rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-      M2 <- cbind(rbind(sum(theta1[[(t)]]),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                  rbind(1,phi_star[[t]],mean(ER_in[[(t)]])),
-                  rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-      M <- cbind(rbind(sum(theta1[[(t)]]),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                 rbind(sum(theta3[[(t)]]),EC_DS[[(t)]]%*%theta3[[(t)]],ER_in[[(t)]]%*%theta3[[(t)]]),
-                 rbind(sum(theta2[[(t)]]),EC_DS[[(t)]]%*%theta2[[(t)]],ER_in[[(t)]]%*%theta2[[(t)]]))
-      gamma1 <- det(M1)/det(M)
-      gamma2 <- det(M2)/det(M)
-      alpha1 <- c(gamma1*sum(theta3[[t]]))
-      alpha2 <- c(gamma2*sum(theta2[[t]]))
-      w1 <- (1-alpha1-alpha2)*theta1[[t]]/sum(theta1[[t]])
-      w2 <- alpha1*theta3[[t]]/sum(theta3[[t]])
-      w3 <- alpha2*theta2[[t]]/sum(theta2[[t]])
-      w[[(t)]] = w1 +  w2 + w3
-    }
-    else{
-      # 1 centrality constraint case
-      alpha=c((sum(theta3[[t]])*sum(theta1[[t]])*phi_star[[t]]-(sum(theta3[[t]]))^2)/(EC_DS[[(t)]]%*%theta3[[t]]*sum(theta1[[t]])-(sum(theta3[[t]]))^2))
-      w[[(t)]] = alpha*theta3[[t]]/sum(theta3[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-    }}
-  else{
-    if(((theta1[[t]]/sum(theta1[[t]]))%*%ER_in[[(t)]])<mean(ER_in[[t]])){
-      # 1 expected return constraint case 
-      alpha=c((sum(theta2[[t]])*sum(theta1[[t]])*mean(ER_in[[t]])-(sum(theta2[[t]]))^2)/(ER_in[[(t)]]%*%theta2[[t]]*sum(theta1[[t]])-(sum(theta2[[t]]))^2))
-      w[[(t)]] = alpha*theta2[[t]]/sum(theta2[[t]])+(1-alpha)*theta1[[t]]/sum(theta1[[t]])
-    }
-    else{
-      # global minimum variance case 
-      w[[(t)]] = theta1[[t]]/sum(theta1[[t]])
-    }
-  }
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_datadriven_phistar_3constraint_Dantzig<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_3constraint_Dantzig<-cumprod(return_network_datadriven_phistar_3constraint_Dantzig)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_3constraint_Dantzig<-w
-
-###### network portfolio data-driven constraint with glasso ######
-cumureturn_network_datadriven_phistar_3constraint_glasso<-list()
-return_network_datadriven_phistar_3constraint_glasso<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-cumureturn_temporal<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[(t)]]))>phi_star[[t]]){
-    if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(ER_in[[(t)]]))<phi_star[[t]]){
-      # 3 constraint case
-      M1 <- cbind(rbind(1,phi_star[[t]],mean(ER_in[[(t)]])),
-                  rbind(sum(glasso.icov%*%EC_DS[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]]),
-                  rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-      M2 <- cbind(rbind(sum(glasso.icov),EC_DS[[(t)]]%*%row_sums(glasso.icov),ER_in[[(t)]]%*%row_sums(glasso.icov)),
-                  rbind(1,phi_star[[t]],mean(ER_in[[(t)]])),
-                  rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-      M <- cbind(rbind(sum(glasso.icov),EC_DS[[(t)]]%*%theta1[[(t)]],ER_in[[(t)]]%*%theta1[[(t)]]),
-                 rbind(sum(glasso.icov%*%EC_DS[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%EC_DS[[(t)]]),
-                 rbind(sum(glasso.icov%*%ER_in[[(t)]]),EC_DS[[(t)]]%*%glasso.icov%*%ER_in[[(t)]],ER_in[[(t)]]%*%glasso.icov%*%ER_in[[(t)]]))
-      gamma1 <- det(M1)/det(M)
-      gamma2 <- det(M2)/det(M)
-      alpha1 <- c(gamma1*sum(glasso.icov%*%EC_DS[[(t)]]))
-      alpha2 <- c(gamma2*sum(glasso.icov%*%ER_in[[(t)]]))
-      w1 <- (1-alpha1-alpha2)*row_sums(glasso.icov)/sum(glasso.icov)
-      w2 <- alpha1*glasso.icov%*%EC_DS[[(t)]]/sum(glasso.icov%*%EC_DS[[(t)]])
-      w3 <- alpha2*glasso.icov%*%ER_in[[(t)]]/sum(glasso.icov%*%ER_in[[(t)]])
-      w[[(t)]] = c(w1 +  w2 + w3)
-    }
-    else{
-      # 1 centrality constraint case
-      alpha=(sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*phi_star[[t]]-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2)
-      w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-    }}
-  else{
-    if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%ER_in[[(t)]])<mean(ER_in[[t]])){
-      # 1 expected return constraint case 
-      alpha=(sum(glasso.icov%*%ER_in[[t]])*sum(glasso.icov)*mean(ER_in[[t]])-(sum(glasso.icov%*%ER_in[[t]]))^2)/(ER_in[[(t)]]%*%glasso.icov%*%ER_in[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%ER_in[[t]]))^2)
-      w[[(t)]] = c(alpha[1]*glasso.icov%*%ER_in[[t]]/sum(glasso.icov%*%ER_in[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
-    }
-    else{
-      # global minimum variance case 
-      w[[t]]=row_sums(glasso.icov)/sum(glasso.icov)
-    }
-  }
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_datadriven_phistar_3constraint_glasso<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_3constraint_glasso<-cumprod(return_network_datadriven_phistar_3constraint_glasso)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_3constraint_glasso<-w
-
-###### network portfolio data-driven constraint with plug in no short ######
-cumureturn_network_datadriven_phistar_3constraint_noshort<-list()
-return_network_datadriven_phistar_3constraint_noshort<-list()
-cumureturn_temporal<-list()
-phi_star<-centrality_equal_portfolio
-w<-list()
-for(t in 1: length(W_in)){
-  ## compute global minimum variance portfolio ##
-  net.gmin.port = network.3constraint.portfolio(EC_DS[[(t)]],ER_in[[t]], COV_in[[(t)]],phi_star[[t]],mean(ER_in[[t]]),FALSE)
-  w[[(t)]] =net.gmin.port$weights
-  aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
-  cumureturn_temporal[[t]]<-rowSums(aus)
-}
-return_network_datadriven_phistar_3constraint_noshort<-as.matrix(cbind(unlist(cumureturn_temporal))+1)
-cumureturn_network_datadriven_phistar_3constraint_noshort<-cumprod(return_network_datadriven_phistar_3constraint_noshort)
-w<-t(matrix(unlist(w),p,T.windows))
-colnames(w) = node.label
-w_network_datadriven_phistar_3constraint_noshort<-w
-
-###### network portfolio data-driven constraint with Dantzig no short ######
-
-#### Save portfolios ####
-Portfolio.Scenario <- list("return_minVar"=return_minVar,"cumureturn_minVar"=cumureturn_minVar,"w_minVar"=w_minVar,
-                           "return_minVar_Dantzig"=return_minVar_Dantzig,"cumureturn_minVar_Dantzig"=cumureturn_minVar_Dantzig,"w_minVar_Dantzig"=w_minVar_Dantzig,
-                           "return_minVar_glasso"=return_minVar_glasso,"cumureturn_minVar_glasso"=cumureturn_minVar_glasso,"w_minVar_glasso"=w_minVar_glasso,
-                           "return_minVar_noshort"=return_minVar_noshort,"cumureturn_minVar_noshort"=cumureturn_minVar_noshort,"w_minVar_noshort"=w_minVar_noshort,
-                           "return_meanVar"=return_meanVar,"cumureturn_meanVar"=cumureturn_meanVar,"w_meanVar"=w_meanVar,
-                           "return_meanVar_Dantzig"=return_meanVar_Dantzig,"cumureturn_meanVar_Dantzig"=cumureturn_meanVar_Dantzig,"w_meanVar_Dantzig"=w_meanVar_Dantzig,
-                           "return_meanVar_glasso"=return_meanVar_glasso,"cumureturn_meanVar_glasso"=cumureturn_meanVar_glasso,"w_meanVar_glasso"=w_meanVar_glasso,
-                           "return_meanVar_noshort"=return_meanVar_noshort,"cumureturn_meanVar_noshort"=cumureturn_meanVar_noshort,"w_meanVar_noshort"=w_meanVar_noshort,
-                           "return_equal"=return_equal,"cumureturn_equal"=cumureturn_equal,"w_equal"=w_equal,
-                           "return_network_2constraint"=return_network_2constraint,"cumureturn_network_2constraint"=cumureturn_network_2constraint,"w_network_2constraint"=w_network_2constraint,
-                           "return_network_2constraint_Dantzig"=return_network_2constraint_Dantzig,"cumureturn_network_2constraint_Dantzig"=cumureturn_network_2constraint_Dantzig,"w_network_2constraint_Dantzig"=w_network_2constraint_Dantzig,
-                           "return_network_2constraint_glasso"=return_network_2constraint_glasso,"cumureturn_network_2constraint_glasso"=cumureturn_network_2constraint_glasso,"w_network_2constraint_glasso"=w_network_2constraint_glasso,
-                           "return_network_2constraint_noshort"=return_network_2constraint_noshort,"cumureturn_network_2constraint_noshort"=cumureturn_network_2constraint_noshort,"w_network_2constraint_noshort"=w_network_2constraint_noshort,
-                           "return_network_vary_with_phi"=return_network_vary_with_phi,"cumureturn_network_vary_with_phi"=cumureturn_network_vary_with_phi,"w_network_vary_with_phi"=w_network_vary_with_phi,
-                           "return_network_vary_with_phi_Dantzig"=return_network_vary_with_phi_Dantzig,"cumureturn_network_vary_with_phi_Dantzig"=cumureturn_network_vary_with_phi_Dantzig,"w_network_vary_with_phi_Dantzig"=w_network_vary_with_phi_Dantzig,
-                           "return_network_vary_with_phi_glasso"=return_network_vary_with_phi_glasso,"cumureturn_network_vary_with_phi_glasso"=cumureturn_network_vary_with_phi_glasso,"w_network_vary_with_phi_glasso"=w_network_vary_with_phi_glasso,
-                           "return_network_vary_with_phi_noshort"=return_network_vary_with_phi_noshort,"cumureturn_network_vary_with_phi_noshort"=cumureturn_network_vary_with_phi_noshort,"w_network_vary_with_phi_noshort"=w_network_vary_with_phi_noshort,
-                           "return_network_datadriven_phistar"=return_network_datadriven_phistar,"cumureturn_network_datadriven_phistar"=cumureturn_network_datadriven_phistar,"w_network_datadriven_phistar"=w_network_datadriven_phistar,
-                           "return_network_datadriven_phistar_Dantzig"=return_network_datadriven_phistar_Dantzig,"cumureturn_network_datadriven_phistar_Dantzig"=cumureturn_network_datadriven_phistar_Dantzig,"w_network_datadriven_phistar_Dantzig"=w_network_datadriven_phistar_Dantzig,
-                           "return_network_datadriven_phistar_glasso"=return_network_datadriven_phistar_glasso,"cumureturn_network_datadriven_phistar_glasso"=cumureturn_network_datadriven_phistar_glasso,"w_network_datadriven_phistar_glasso"=w_network_datadriven_phistar_glasso,
-                           "return_network_datadriven_phistar_noshort"=return_network_datadriven_phistar_noshort,"cumureturn_network_datadriven_phistar_noshort"=cumureturn_network_datadriven_phistar_noshort,"w_network_datadriven_phistar_noshort"=w_network_datadriven_phistar_noshort,
-                           "return_network_3constraint"=return_network_3constraint,"cumureturn_network_3constraint"=cumureturn_network_3constraint,"w_network_3constraint"=w_network_3constraint,
-                           "return_network_3constraint_Dantzig"=return_network_3constraint_Dantzig,"cumureturn_network_3constraint_Dantzig"=cumureturn_network_3constraint_Dantzig,"w_network_3constraint_Dantzig"=w_network_3constraint_Dantzig,
-                           "return_network_3constraint_glasso"=return_network_3constraint_glasso,"cumureturn_network_3constraint_glasso"=cumureturn_network_3constraint_glasso,"w_network_3constraint_glasso"=w_network_3constraint_glasso,
-                           "return_network_3constraint_noshort"=return_network_3constraint_noshort,"cumureturn_network_3constraint_noshort"=cumureturn_network_3constraint_noshort,"w_network_3constraint_noshort"=w_network_3constraint_noshort,
-                           "return_network_vary_with_phi_3constraint"=return_network_vary_with_phi_3constraint,"cumureturn_network_vary_with_phi_3constraint"=cumureturn_network_vary_with_phi_3constraint,"w_network_vary_with_phi_3constraint"=w_network_vary_with_phi_3constraint,
-                           "return_network_vary_with_phi_3constraint_Dantzig"=return_network_vary_with_phi_3constraint_Dantzig,"cumureturn_network_vary_with_phi_3constraint_Dantzig"=cumureturn_network_vary_with_phi_3constraint_Dantzig,"w_network_vary_with_phi_3constraint_Dantzig"=w_network_vary_with_phi_3constraint_Dantzig,
-                           "return_network_vary_with_phi_3constraint_glasso"=return_network_vary_with_phi_3constraint_glasso,"cumureturn_network_vary_with_phi_3constraint_glasso"=cumureturn_network_vary_with_phi_3constraint_glasso,"w_network_vary_with_phi_3constraint_glasso"=w_network_vary_with_phi_3constraint_glasso,
-                           "return_network_vary_with_phi_3constraint_noshort"=return_network_vary_with_phi_3constraint_noshort,"cumureturn_network_vary_with_phi_3constraint_noshort"=cumureturn_network_vary_with_phi_3constraint_noshort,"w_network_vary_with_phi_3constraint_noshort"=w_network_vary_with_phi_3constraint_noshort,
-                           "return_network_datadriven_phistar_3constraint"=return_network_datadriven_phistar_3constraint,"cumureturn_network_datadriven_phistar_3constraint"=cumureturn_network_datadriven_phistar_3constraint,"w_network_datadriven_phistar_3constraint"=w_network_datadriven_phistar_3constraint,
-                           "return_network_datadriven_phistar_3constraint_Dantzig"=return_network_datadriven_phistar_3constraint_Dantzig,"cumureturn_network_datadriven_phistar_3constraint_Dantzig"=cumureturn_network_datadriven_phistar_3constraint_Dantzig,"w_network_datadriven_phistar_3constraint_Dantzig"=w_network_datadriven_phistar_3constraint_Dantzig,
-                           "return_network_datadriven_phistar_3constraint_glasso"=return_network_datadriven_phistar_3constraint_glasso,"cumureturn_network_datadriven_phistar_3constraint_glasso"=cumureturn_network_datadriven_phistar_3constraint_glasso,"w_network_datadriven_phistar_3constraint_glasso"=w_network_datadriven_phistar_3constraint_glasso,
-                           "return_network_datadriven_phistar_3constraint_noshort"=return_network_datadriven_phistar_3constraint_noshort,"cumureturn_network_datadriven_phistar_3constraint_noshort"=cumureturn_network_datadriven_phistar_3constraint_noshort,"w_network_datadriven_phistar_3constraint_noshort"=w_network_datadriven_phistar_3constraint_noshort)
-save(Portfolio.Scenario,file="Portfolios_20230513.RData")

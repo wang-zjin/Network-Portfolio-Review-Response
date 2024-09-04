@@ -649,7 +649,7 @@ network.efficient.portfolio =
     return(ans)
   }
 
-network.2constraint.portfolio =
+network.3constraint.portfolio =
   function(nc,er, cov.mat, target.nc,target.er, shorts=TRUE)
   {
     call = match.call()
@@ -884,4 +884,118 @@ linfun4=function(Sn,b,lambda,a1=1,indx=1)
                   G=A,H=rhs,Cost=C,ispos=FALSE)$X
   # return(solvetheta)
   return(solvetheta)
+}
+
+
+Dantzig_eigencent_rollwind_hypertune = function(returnstd, window_size = 500, lambda_max = 1){
+  
+  tic("Tuning parameter of Dantzig estimation in Eigenvector centrality")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):(window_size+22+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  
+  
+  
+  lmd.EC.Dantzig.list = list()
+  for (t in c(1:length(W_in))) {
+    n<-dim(W_in[[t]])[1]
+    B=100
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    lmd.i=c()
+    for (valid.block in 1:n.block) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[t]][train.ind,]
+      returnstd.valid=W_in[[t]][valid.ind,]
+      mu.train=rep(0,p)
+      mu.valid=rep(0,p)
+      
+      corr.train=cor(returnstd.train)
+      corr.train[is.na(corr.train)]=0
+      A.train=corr.train-diag(1,p,p)
+      corr.valid=cor(returnstd.valid)
+      corr.valid[is.na(corr.valid)]=0
+      A.valid=corr.valid-diag(1,p,p)
+      
+      cov.train=A.train-diag(max(eigen(A.train)$value),p,p)
+      cov.valid=A.valid-diag(max(eigen(A.valid)$value),p,p)
+      lambda.grid=seq(0,lambda_max,length=101)[2:101]
+      l.lambda=length(lambda.grid)
+      cv.l.error=NULL
+      cv.l.lmd=NULL
+      for(i in 1:l.lambda){
+        lmd=lambda.grid[i]
+        print(i)
+        # lmd=0.2
+        lin.train=linfun3(cov.train,mu.train,lmd,abs(eigen(cov.valid)$vector[1,1]))
+        # max(lin.train)
+        # max(cov.train%*%lin.train)
+        if(!(all(lin.train==0))){
+          error=sum((cov.valid%*%lin.train-mu.valid)^2)
+          cv.l.error=c(cv.l.error,error)
+          cv.l.lmd=c(cv.l.lmd, lmd)
+        }
+      }
+      lmd.i[valid.block]=min(cv.l.lmd[which(cv.l.error==min(cv.l.error))])
+    }
+    lmd=mean(lmd.i[lmd.i<Inf])
+    # lmd.EC.Dantzig <- 0.682
+    lmd.EC.Dantzig <- lmd
+    lmd.EC.Dantzig.list[[t]] = lmd.EC.Dantzig
+  }
+  toc()
+  
+  save(lmd.EC.Dantzig.list,file=paste0("Dantzig_lambda_rolling_windowsize",window_size,".RData"))
+  # load("Dantzig_lambda_rolling_window_125.RData")
+  # mean(unlist(lmd.EC.Dantzig.list)) # 0.5085714
+  # std(unlist(lmd.EC.Dantzig.list))
+  load(paste0("Dantzig_lambda_rolling_windowsize",window_size,".RData"))
+  lmd.EC.Dantzig = lmd.EC.Dantzig.list[[1]] 
+  
+  #   EC_DS <- eigenvector centrality estimated by Dantzig selector
+  EC_DS<-list()
+  a=c()
+  for (t in 1: length(W_in)) {
+    print(t)
+    EC_DS[[t]] =linfun3(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p),rep(0,p),lambda=lmd.EC.Dantzig,abs(eigen(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p))$vector[1,1]))
+    EC_DS[[t]]=EC_DS[[t]]/max(EC_DS[[t]])
+    # boxplot(EC_DS[[t]])
+    a[t]=sum(EC_DS[[t]]==0)
+  }
+  a
+  eigenvector_centrality = list("eigenvector_absolute_value"=EC_in,"eigenvector_centrality_Dantzig"=EC_DS,
+                                "zeors_in_EC_DS"=a,"covariance_matrix"=COV_in,"correlation_matrix"=C_in,
+                                "expected_return"=ER_in)
+  save(eigenvector_centrality,file = paste0("eigenvector_centrality_WS",window_size,"_20240723.RData"))
 }
