@@ -786,6 +786,7 @@ linfun1=function(Sn,b,lambda)
   #						-hatS x>=-(lambda 1+b)
   #						hatS x>=-lambda 1+b
   #						x^T1=1
+  p = length(b)
   a=rep(0,2*p)
   a[c(1,1+p)]=1
   A0=toeplitz(a)
@@ -834,6 +835,8 @@ linfun2=function(Sn,b1,b2,lambda)
   # return(solvetheta)
   return(solvetheta)
 }
+
+
 linfun3=function(Sn,b,lambda,a1=1)
 {
   #equivalent to solving   min 1'x
@@ -841,6 +844,7 @@ linfun3=function(Sn,b,lambda,a1=1)
   #						-hatS x>=-(lambda 1+b)
   #						hatS x>=-lambda 1+b
   #						x(1)=a1
+  p <- dim(Sn)[1]
   a=rep(0,p)
   a[1]=1
   A0=diag(1,p,p)
@@ -857,6 +861,51 @@ linfun3=function(Sn,b,lambda,a1=1)
   solvetheta=linp(E=EE,F=FF,
     G=A,H=rhs,Cost=C,ispos=FALSE)$X
   # return(solvetheta)
+  return(solvetheta)
+}
+linfun3_1=function(Sn,b,lambda,a1=1)
+{
+  #equivalent to solving   min 1'x
+  #such that		x>=0
+  #						-hatS x>=-(lambda 1+b)
+  #						hatS x>=-lambda 1+b
+  #						x(1)=a1
+  p <- dim(Sn)[1]
+  a=rep(0,p)
+  a[1]=1
+  A0=diag(1,p,p)
+  A1=cbind(-Sn)
+  A2=-A1
+  A=rbind(A0,A1,A2)
+  rhs=c(rep(0,p),c(-b,b)-lambda*rep(1,p))
+  C=rep(1,p)
+  EE=diag(a)
+  a[1]=a1
+  FF=a
+  #	EE=rep(c(0,1),c(p,p))
+  #	FF=1
+  solvetheta=linp(E=EE,F=FF,
+                  G=A,H=rhs,Cost=C,ispos=FALSE)$X
+  
+  # Make sure max(solvetheta) is not all 0
+  while (max(solvetheta)==0) {
+    lambda = lambda + 0.1
+    a=rep(0,p)
+    a[1]=1
+    A0=diag(1,p,p)
+    A1=cbind(-Sn)
+    A2=-A1
+    A=rbind(A0,A1,A2)
+    rhs=c(rep(0,p),c(-b,b)-lambda*rep(1,p))
+    C=rep(1,p)
+    EE=diag(a)
+    a[1]=a1
+    FF=a
+    #	EE=rep(c(0,1),c(p,p))
+    #	FF=1
+    solvetheta=linp(E=EE,F=FF,
+                    G=A,H=rhs,Cost=C,ispos=FALSE)$X
+  }
   return(solvetheta)
 }
 linfun4=function(Sn,b,lambda,a1=1,indx=1)
@@ -998,4 +1047,1023 @@ Dantzig_eigencent_rollwind_hypertune = function(returnstd, window_size = 500, la
                                 "zeors_in_EC_DS"=a,"covariance_matrix"=COV_in,"correlation_matrix"=C_in,
                                 "expected_return"=ER_in)
   save(eigenvector_centrality,file = paste0("eigenvector_centrality_WS",window_size,"_20240723.RData"))
+}
+
+#### Dantzig selector estimation for eigenvector centrality, rolling window calibrate hyperparameter ####
+estimate_rollingwindow_dantzig_lambda_eigenvectorcentrality = function(file_name = "SP500 securities_up_20230306.csv", 
+                                                                       window_size=500){
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter of Dantzig Selector for Eigenvector Centrality, using rolling window
+  
+  tic("Tuning parameter of Dantzig estimation")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  lmd.EC.Dantzig.list = list()
+  for (t in c(1:T.windows)) {
+    n<-dim(W_in[[t]])[1]
+    B=100
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    lmd.i=c()
+    for (valid.block in 1:n.block) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[t]][train.ind,]
+      returnstd.valid=W_in[[t]][valid.ind,]
+      mu.train=rep(0,p)
+      mu.valid=rep(0,p)
+      
+      corr.train=cor(returnstd.train)
+      corr.train[is.na(corr.train)]=0
+      A.train=corr.train-diag(1,p,p)
+      corr.valid=cor(returnstd.valid)
+      corr.valid[is.na(corr.valid)]=0
+      A.valid=corr.valid-diag(1,p,p)
+      
+      cov.train=A.train-diag(max(eigen(A.train)$value),p,p)
+      cov.valid=A.valid-diag(max(eigen(A.valid)$value),p,p)
+      lambda.grid=seq(0,1,length=101)[2:101]
+      l.lambda=length(lambda.grid)
+      cv.l.error=NULL
+      cv.l.lmd=NULL
+      for(i in 1:l.lambda){
+        lmd=lambda.grid[i]
+        print(i)
+        # lmd=0.2
+        lin.train=linfun3(cov.train,mu.train,lmd,abs(eigen(cov.valid)$vector[1,1]))
+        # max(lin.train)
+        # max(cov.train%*%lin.train)
+        if(!(all(lin.train==0))){
+          error=sum((cov.valid%*%lin.train-mu.valid)^2)
+          cv.l.error=c(cv.l.error,error)
+          cv.l.lmd=c(cv.l.lmd, lmd)
+        }
+      }
+      lmd.i[valid.block]=min(cv.l.lmd[which(cv.l.error==min(cv.l.error))])
+    }
+    lmd=mean(lmd.i[lmd.i<Inf])
+    # lmd.EC.Dantzig <- 0.682
+    lmd.EC.Dantzig <- lmd
+    lmd.EC.Dantzig.list[[t]] = lmd.EC.Dantzig
+  }
+  toc()
+  
+  save(lmd.EC.Dantzig.list, file=paste0("Dantzig_lambda_rolling_window_windowsize",window_size,".RData"))
+  
+}
+
+estimate_rollingwindow_dantzig_eigenvectorcentrality = function(file_name = "SP500 securities_up_20230306.csv", 
+                                                                window_size=500){
+  
+  tic("Estmate Rolling Window Eigenvector Centrality by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter of Dantzig Selector for Eigenvector Centrality, using rolling window
+  
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  
+  load(paste0("Dantzig_lambda_rolling_window_windowsize",window_size,".RData"))
+  
+  #   EC_DS <- eigenvector centrality estimated by Dantzig selector
+  EC_DS<-list()
+  a=c()
+  for (t in 1: T.windows) {
+    print(t)
+    
+    lmd.EC.Dantzig = lmd.EC.Dantzig.list[[t]] 
+    
+    EC_DS[[t]] =linfun3_1(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p),
+                          rep(0,p),
+                          lambda=lmd.EC.Dantzig,
+                          abs(eigen(C_in[[t]]-diag(1,p,p)-diag(max(eigen(C_in[[(t)]])$value),p,p))$vector[1,1])
+    )
+    EC_DS[[t]]=EC_DS[[t]]/max(EC_DS[[t]])
+    a[t]=sum(EC_DS[[t]]==0)
+  }
+  a
+  eigenvector_centrality = list("eigenvector_absolute_value"=EC_in,"eigenvector_centrality_Dantzig"=EC_DS,
+                                "zeors_in_EC_DS"=a,"covariance_matrix"=COV_in,"correlation_matrix"=C_in,
+                                "expected_return"=ER_in)
+  save(eigenvector_centrality,file = paste0("eigenvector_centrality_WS",window_size,"_20250117.RData"))
+  
+  toc()
+}
+
+
+#### Dantzig selector estimation for portfolio parameters ####
+
+##### CV for tuning lambdas in portfolio solutions
+
+##### CV for tuning lambda in estimation Sigma^-1 1 using the first "windowsize"(500/750/1000) data ######
+
+estimate_dantzig_lambda1_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV hyperparameter lambda1 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Use for recurrence
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/5)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  lmd.i=c()
+  for (valid.block in 1:5) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    mu.train=rep(1,p)
+    mu.valid=rep(1,p)
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l=NULL
+    time_threshold = 300
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      cat("Iteration", i, "of", l.lambda, "\n")
+      
+      # Set a time limit for the computation
+      tryCatch({
+        setTimeLimit(elapsed = time_threshold, transient = TRUE)
+        lin.train <- linfun1(cov.train, mu.train, lmd)
+        if (!all(lin.train == 0)) {
+          error <- sum((cov.valid %*% lin.train - mu.valid)^2)
+          cv.l.error <- c(cv.l.error, error)
+          cv.l <- c(cv.l, lmd)
+        }
+      }, error = function(e) {
+        cat("Iteration", i, "exceeded time limit. Skipping to next iteration.\n")
+      }, finally = {
+        # Reset the time limit after each iteration
+        setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+      })
+    }
+      
+      # # Measure the time taken for each iteration
+      # time_taken <- system.time({
+      #   lin.train=linfun1(cov.train,mu.train,lmd)
+      #   if(!(all(lin.train==0))){
+      #     error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      #     cv.l.error=c(cv.l.error,error)
+      #     cv.l=c(cv.l,lmd)
+      #   }
+      # })
+      # 
+      # # If the time taken exceeds the threshold, skip to the next iteration
+      # if(time_taken["elapsed"] > time_threshold){
+      #   cat("Iteration", i, "took too long. Skipping to next iteration.\n")
+      #   next
+      # }
+     
+    lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd1=mean(lmd.i[lmd.i<Inf])
+  
+  
+  dantzig_lambda1_portfolio_parameter = list("lmd1"=lmd1)
+  save(dantzig_lambda1_portfolio_parameter,file = paste0("dantzig_lambda1_portfolio_parameter_WS",window_size,"_20250117.RData"))
+  
+  toc()
+}
+
+##### CV for tuning lambda in estimation Sigma^-1 mu, using the first "windowsize"(500/750/1000) data ######
+
+estimate_dantzig_lambda2_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV hyperparameter lambda2 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/5)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  lmd.i=c()
+  for (valid.block in 1:5) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    mu.train=colMeans(returnstd.train)
+    mu.valid=colMeans(returnstd.valid)
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    lambda.grid=seq(min(max(abs(mu.train))/100,min(abs(mu.train))), 0.01,length=101)[2:100]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l=NULL
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      print(i)
+      
+      
+      lin.train=linfun1(cov.train,mu.train,lmd)
+      if(!(all(lin.train==0))){
+        error=sum((cov.valid%*%lin.train-mu.valid)^2)
+        cv.l.error=c(cv.l.error,error)
+        cv.l=c(cv.l,lmd)
+      }
+    }
+    lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd2=mean(lmd.i[lmd.i<Inf])
+  
+  dantzig_lambda2_portfolio_parameter = list("lmd2"=lmd2)
+  save(dantzig_lambda2_portfolio_parameter,file = paste0("dantzig_lambda2_portfolio_parameter_WS",window_size,"_20250117.RData"))
+  
+  toc()
+}
+
+##### CV for tuning lambda in estimation Sigma^-1 phi, using the first "windowsize"(500/750/1000) data ######
+estimate_dantzig_lambda3_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV hyperparameter lambda3 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Load eigenvector centrality
+  load(paste0("eigenvector_centrality_WS",window_size,"_20250117.RData"))
+  EC_DS = eigenvector_centrality$eigenvector_centrality_Dantzig
+  
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/5)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  lmd.i=c()
+  for (valid.block in 1:5) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    mu.train=EC_DS[[1]]
+    mu.valid=EC_DS[[1]]
+    lambda.grid=seq(0.1, max(mu.train),length=101)[1:100]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l=NULL
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      print(i)
+      # lmd=0.1
+      lin.train=linfun1(cov.train,mu.train,lmd)
+      # sum(lin.train==0)
+      if(!(all(lin.train==0))){
+        error=sum((cov.valid%*%lin.train-mu.valid)^2)
+        cv.l.error=c(cv.l.error,error)
+        cv.l=c(cv.l,lmd)
+      }
+    }
+    lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd3=mean(lmd.i[lmd.i<Inf])
+  
+  dantzig_lambda3_portfolio_parameter = list("lmd3"=lmd3)
+  save(dantzig_lambda3_portfolio_parameter,file = paste0("dantzig_lambda3_portfolio_parameter_WS",window_size,"_20250117.RData"))
+  
+  toc()
+  
+}
+
+##### CV for tuning parameter in glasso, using the first "windowsize"(500/750/1000) data #####
+
+estimate_glasso_rho_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV for tuning parameter in glasso")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/5)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  rho.i=c()
+  for (valid.block in 1:5) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    mu.train=colMeans(returnstd.train)
+    mu.valid=colMeans(returnstd.valid)
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    rho.grid=seq(0,0.8,length=101)[2:101]
+    l.rho=length(rho.grid)
+    cv.rho.error=NULL
+    cv.rho=NULL
+    for (i in 1:l.rho){
+      rho=rho.grid[i]
+      prec.glasso=glasso(cov.train,rho=rho)$wi
+      error=sum((prec.glasso%*%cov.valid-diag(rep(1,p)))^2)
+      cv.rho.error=c(cv.rho.error,error)
+      cv.rho=c(cv.rho,rho)
+      print(i)
+    }
+    rho.i[valid.block]=cv.rho[which(cv.rho.error==min(cv.rho.error))]
+  }
+  rho=mean(rho.i[rho.i<Inf])
+  
+  glasso_rho_portfolio_parameter = list("rho"=rho)
+  save(glasso_rho_portfolio_parameter,file = paste0("glasso_rho_portfolio_parameter_WS",window_size,"_20250117.RData"))
+  
+  toc()
+}
+
+##### Estimate portfolio parameters #####
+
+estimate_portfolio_parameter = function(EC_file_name = "eigenvector_centrality_WS750_20250117.RData", 
+                                        DS_lambda1_file_name = "dantzig_lambda1_portfolio_parameter_WS750_20250117.RData", 
+                                        DS_lambda2_file_name = "dantzig_lambda2_portfolio_parameter_WS750_20250117.RData", 
+                                        DS_lambda3_file_name = "dantzig_lambda3_portfolio_parameter_WS750_20250117.RData", 
+                                        window_size=750){
+  
+  tic("Estimate Portfolio Parameters rho1, rho2, rho3 by Dantzig-type selector")
+  
+  load(EC_file_name)
+  EC_in=eigenvector_centrality$eigenvector_absolute_value
+  EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
+  ER_in=eigenvector_centrality$expected_return
+  C_in=eigenvector_centrality$correlation_matrix
+  COV_in=eigenvector_centrality$covariance_matrix
+  
+  load(DS_lambda1_file_name)
+  load(DS_lambda2_file_name)
+  load(DS_lambda3_file_name)
+  lmd1 = dantzig_lambda1_portfolio_parameter$lmd1
+  lmd2 = dantzig_lambda2_portfolio_parameter$lmd2
+  lmd3 = dantzig_lambda3_portfolio_parameter$lmd3
+  
+  rho1<-list()
+  rho2<-list()
+  rho3<-list()
+  p <- dim(COV_in[[1]])[1]
+  for(t in 1: length(COV_in)){
+    print(t)
+    ptm<-proc.time()
+    ## compute global minimum variance portfolio ##
+    rho1[[t]] =linfun1(COV_in[[t]],rep(1,p),lambda=lmd1) # lambda <= 0.1 will lead to be infeasible
+    # print('rho1')
+    rho2[[t]] =linfun1(COV_in[[t]],ER_in[[t]],lambda=lmd2) # lambda <= 0.1 will lead to be infeasible
+    # print('rho2')
+    rho3[[t]] =linfun1(COV_in[[t]],EC_DS[[t]],lambda=lmd3) # lambda <= 0.1 will lead to be infeasible
+    ptm<-proc.time()-ptm
+    print(ptm)
+  }
+  rho<-list("rho1"=rho1,
+              "rho2"=rho2,
+              "rho3"=rho3)
+  save(rho,file=paste0("rho_Dantzig_portfolio_WS",window_size,"_20250125.RData"))
+  
+  toc()
+}
+
+##### CV for tuning lambda in estimation Sigma^-1 1 using the rolling "windowsize"(500/750/1000) data ######
+
+estimate_rollingwindow_dantzig_lambda1_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", 
+                                                                      window_size=375){
+  
+  tic("CV hyperparameter lambda1 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter lambda1 of Dantzig Selector for portfolio parameter phi_1 estimation, using rolling window
+  
+  tic("Tuning parameter of Dantzig estimation")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  lmd1.Dantzig.list = list()
+  for (t in c(1:T.windows)) {
+    
+    # Use for recurrence
+    n<-dim(W_in[[(t)]])[1]
+    B=floor(window_size/3) # 3-fold cross validation
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+    lmd.i=c()
+    for (valid.block in 1:3) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[(t)]][train.ind,]
+      returnstd.valid=W_in[[(t)]][valid.ind,]
+      mu.train=rep(1,p)
+      mu.valid=rep(1,p)
+      cov.train=cov(returnstd.train)
+      cov.valid=cov(returnstd.valid)
+      lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+      l.lambda=length(lambda.grid)
+      cv.l.error=NULL
+      cv.l=NULL
+      time_threshold = 300
+      for(i in 1:l.lambda){
+        lmd=lambda.grid[i]
+        cat("Iteration", i, "of", l.lambda, "\n")
+        
+        # Set a time limit for the computation
+        tryCatch({
+          setTimeLimit(elapsed = time_threshold, transient = TRUE)
+          lin.train <- linfun1(cov.train, mu.train, lmd)
+          if (!all(lin.train == 0)) {
+            error <- sum((cov.valid %*% lin.train - mu.valid)^2)
+            cv.l.error <- c(cv.l.error, error)
+            cv.l <- c(cv.l, lmd)
+          }
+        }, error = function(e) {
+          cat("Iteration", i, "exceeded time limit. Skipping to next iteration.\n")
+        }, finally = {
+          # Reset the time limit after each iteration
+          setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+        })
+      }
+      
+      # # Measure the time taken for each iteration
+      # time_taken <- system.time({
+      #   lin.train=linfun1(cov.train,mu.train,lmd)
+      #   if(!(all(lin.train==0))){
+      #     error=sum((cov.valid%*%lin.train-mu.valid)^2)
+      #     cv.l.error=c(cv.l.error,error)
+      #     cv.l=c(cv.l,lmd)
+      #   }
+      # })
+      # 
+      # # If the time taken exceeds the threshold, skip to the next iteration
+      # if(time_taken["elapsed"] > time_threshold){
+      #   cat("Iteration", i, "took too long. Skipping to next iteration.\n")
+      #   next
+      # }
+      
+      lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+    }
+    lmd1=mean(lmd.i[lmd.i<Inf])
+    lmd1.Dantzig.list[[t]] <- lmd1
+  }
+  
+  
+  dantzig_lambda1_portfolio_parameter = list("lmd1.list"=lmd1.Dantzig.list)
+  save(dantzig_lambda1_portfolio_parameter,file = paste0("dantzig_lambda1_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
+  
+  toc()
+}
+
+##### CV for tuning lambda in estimation Sigma^-1 mu, using the rolling "windowsize"(500/750/1000) data ######
+
+estimate_rollingwindow_dantzig_lambda2_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV hyperparameter lambda2 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter lambda2 of Dantzig Selector for portfolio parameter phi_2 estimation, using rolling window
+  
+  tic("Tuning parameter of Dantzig estimation")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  lmd2.Dantzig.list = list()
+  for (t in c(1:T.windows)) {
+    
+    n<-dim(W_in[[(t)]])[1]
+    B=floor(window_size/3) # 3-fold cross validation
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+    lmd.i=c()
+    for (valid.block in 1:3) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[(t)]][train.ind,]
+      returnstd.valid=W_in[[(t)]][valid.ind,]
+      mu.train=colMeans(returnstd.train)
+      mu.valid=colMeans(returnstd.valid)
+      cov.train=cov(returnstd.train)
+      cov.valid=cov(returnstd.valid)
+      lambda.grid=seq(min(max(abs(mu.train))/100,min(abs(mu.train))), 0.01,length=101)[2:100]
+      l.lambda=length(lambda.grid)
+      cv.l.error=NULL
+      cv.l=NULL
+      for(i in 1:l.lambda){
+        lmd=lambda.grid[i]
+        print(i)
+        
+        
+        lin.train=linfun1(cov.train,mu.train,lmd)
+        if(!(all(lin.train==0))){
+          error=sum((cov.valid%*%lin.train-mu.valid)^2)
+          cv.l.error=c(cv.l.error,error)
+          cv.l=c(cv.l,lmd)
+        }
+      }
+      lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+    }
+    lmd2=mean(lmd.i[lmd.i<Inf])
+    lmd2.Dantzig.list[[t]] <- lmd2
+  }
+  
+  dantzig_lambda2_portfolio_parameter = list("lmd2.list"=lmd2.Dantzig.list)
+  save(dantzig_lambda2_portfolio_parameter,file = paste0("dantzig_lambda2_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
+  
+  toc()
+}
+
+##### CV for tuning lambda in estimation Sigma^-1 phi, using the rolling "windowsize"(500/750/1000) data ######
+estimate_rollingwindow_dantzig_lambda3_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV hyperparameter lambda3 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter lambda3 of Dantzig Selector for portfolio parameter phi_1 estimation, using rolling window
+  
+  tic("Tuning parameter of Dantzig estimation")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  
+  # Load eigenvector centrality
+  load(paste0("eigenvector_centrality_WS",window_size,"_20250117.RData"))
+  EC_DS = eigenvector_centrality$eigenvector_centrality_Dantzig
+  
+  
+  lmd3.Dantzig.list = list()
+  for (t in c(1:T.windows)) {
+    
+    n<-dim(W_in[[(t)]])[1]
+    B=floor(window_size/3) # 3-fold cross validation
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+    lmd.i=c()
+    for (valid.block in 1:3) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[(t)]][train.ind,]
+      returnstd.valid=W_in[[(t)]][valid.ind,]
+      cov.train=cov(returnstd.train)
+      cov.valid=cov(returnstd.valid)
+      mu.train=EC_DS[[1]]
+      mu.valid=EC_DS[[1]]
+      lambda.grid=seq(0.1, max(mu.train),length=101)[1:100]
+      l.lambda=length(lambda.grid)
+      cv.l.error=NULL
+      cv.l=NULL
+      for(i in 1:l.lambda){
+        lmd=lambda.grid[i]
+        print(i)
+        # lmd=0.1
+        lin.train=linfun1(cov.train,mu.train,lmd)
+        # sum(lin.train==0)
+        if(!(all(lin.train==0))){
+          error=sum((cov.valid%*%lin.train-mu.valid)^2)
+          cv.l.error=c(cv.l.error,error)
+          cv.l=c(cv.l,lmd)
+        }
+      }
+      lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+    }
+    lmd3=mean(lmd.i[lmd.i<Inf])
+    lmd3.Dantzig.list[[t]] <- lmd3
+  }
+  
+  dantzig_lambda3_portfolio_parameter = list("lmd3.list"=lmd3.Dantzig.list)
+  save(dantzig_lambda3_portfolio_parameter,file = paste0("dantzig_lambda3_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
+  
+  toc()
+  
+}
+
+##### CV for tuning parameter in glasso, using the rolling "windowsize"(500/750/1000) data #####
+
+estimate_rollingwindow_glasso_rho_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
+  
+  tic("CV hyperparameter lambda3 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter rho of glasso for portfolio construction, using rolling window
+  
+  tic("Tuning parameter of glasso estimation")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  rho.glasso.list = list()
+  for (t in c(1:T.windows)) {
+    
+    n<-dim(W_in[[(t)]])[1]
+    B=floor(window_size/3) # 3-fold cross validation
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+    rho.i=c()
+    for (valid.block in 1:3) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[(t)]][train.ind,]
+      returnstd.valid=W_in[[(t)]][valid.ind,]
+      mu.train=colMeans(returnstd.train)
+      mu.valid=colMeans(returnstd.valid)
+      cov.train=cov(returnstd.train)
+      cov.valid=cov(returnstd.valid)
+      rho.grid=seq(0,0.8,length=101)[2:101]
+      l.rho=length(rho.grid)
+      cv.rho.error=NULL
+      cv.rho=NULL
+      for (i in 1:l.rho){
+        rho=rho.grid[i]
+        prec.glasso=glasso(cov.train,rho=rho)$wi
+        error=sum((prec.glasso%*%cov.valid-diag(rep(1,p)))^2)
+        cv.rho.error=c(cv.rho.error,error)
+        cv.rho=c(cv.rho,rho)
+        print(i)
+      }
+      rho.i[valid.block]=cv.rho[which(cv.rho.error==min(cv.rho.error))]
+    }
+    rho=mean(rho.i[rho.i<Inf])
+    rho.glasso.list[[t]] <- rho
+  }
+  
+  glasso_rho_portfolio_parameter = list("rho.list"=rho.glasso.list)
+  save(glasso_rho_portfolio_parameter,file = paste0("glasso_rho_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
+  
+  toc()
+}
+
+##### Estimate rolling window portfolio parameters #####
+
+estimate_rollingwindow_portfolio_parameter = function(EC_file_name = "eigenvector_centrality_WS750_20250117.RData", 
+                                        DS_lambda1_file_name = "dantzig_lambda1_portfolio_parameter_WS750_20250117.RData", 
+                                        DS_lambda2_file_name = "dantzig_lambda2_portfolio_parameter_WS750_20250117.RData", 
+                                        DS_lambda3_file_name = "dantzig_lambda3_portfolio_parameter_WS750_20250117.RData", 
+                                        window_size=750){
+  
+  tic("Estimate Portfolio Parameters rho1, rho2, rho3 by Dantzig-type selector")
+  
+  load(EC_file_name)
+  EC_in=eigenvector_centrality$eigenvector_absolute_value
+  EC_DS=eigenvector_centrality$eigenvector_centrality_Dantzig
+  ER_in=eigenvector_centrality$expected_return
+  C_in=eigenvector_centrality$correlation_matrix
+  COV_in=eigenvector_centrality$covariance_matrix
+  
+  load(DS_lambda1_file_name)
+  load(DS_lambda2_file_name)
+  load(DS_lambda3_file_name)
+  lmd1.list = dantzig_lambda1_portfolio_parameter$lmd1.list
+  lmd2.list = dantzig_lambda2_portfolio_parameter$lmd2.list
+  lmd3.list = dantzig_lambda3_portfolio_parameter$lmd3.list
+  
+  theta1<-list()
+  theta2<-list()
+  theta3<-list()
+  p <- dim(COV_in[[1]])[1]
+  for(t in 1: length(COV_in)){
+    print(t)
+    ptm<-proc.time()
+    lmd1 <- lmd1.list[[t]]
+    lmd2 <- lmd2.list[[t]]
+    lmd3 <- lmd3.list[[t]]
+    ## compute global minimum variance portfolio ##
+    theta1[[t]] =linfun1(COV_in[[t]],rep(1,p),lambda=lmd1) # lambda <= 0.1 will lead to be infeasible
+    # print('theta1')
+    theta2[[t]] =linfun1(COV_in[[t]],ER_in[[t]],lambda=lmd2) # lambda <= 0.1 will lead to be infeasible
+    # print('theta2')
+    theta3[[t]] =linfun1(COV_in[[t]],EC_DS[[t]],lambda=lmd3) # lambda <= 0.1 will lead to be infeasible
+    ptm<-proc.time()-ptm
+    print(ptm)
+  }
+  theta<-list("theta1"=theta1,
+            "theta2"=theta2,
+            "theta3"=theta3)
+  save(theta,file=paste0("theta_Dantzig_portfolio_WS",window_size,"_20250126.RData"))
+  
+  toc()
 }

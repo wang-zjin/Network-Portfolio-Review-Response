@@ -649,7 +649,7 @@ network.efficient.portfolio =
     return(ans)
   }
 
-network.2constraint.portfolio =
+network.3constraint.portfolio =
   function(nc,er, cov.mat, target.nc,target.er, shorts=TRUE)
   {
     call = match.call()

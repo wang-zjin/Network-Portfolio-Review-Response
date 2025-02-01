@@ -409,16 +409,19 @@ xtable(rbind(cbind(cumureturn_minVar[n]/n*252*100,
 ),digits = 2)
 
 
-sort(col_sums(w_minVar),decreasing = T)[1:5]
-sort(col_sums(w_meanVar),decreasing = T)[1:5]
-sort(col_sums(w_equal),decreasing = T)[1:5]
-sort(col_sums(w_network_vary_with_phi[[1]]),decreasing = T)[1:5]
-sort(col_sums(w_network_vary_with_phi_Dantzig[[1]]),decreasing = T)[1:5]
-# CHD       PNW       IRM        KR       NEM 
-sort(col_sums(w_network_vary_with_phi_glasso[[1]]),decreasing = T)[1:5]
-sort(col_sums(w_network_vary_with_phi_3constraint[[1]]),decreasing = T)[1:5]
-sort(col_sums(w_network_vary_with_phi_3constraint_Dantzig[[1]]),decreasing = T)[1:5]
-# CHD      PNW       KR      BLK      NEM 
-sort(col_sums(w_network_vary_with_phi_3constraint_glasso[[1]]),decreasing = T)[1:5]
+# Portfolio with short constraints
 
 
+# sort(col_sums(w_minVar),decreasing = T)[1:5]
+# sort(col_sums(w_meanVar),decreasing = T)[1:5]
+# sort(col_sums(w_equal),decreasing = T)[1:5]
+# sort(col_sums(w_network_vary_with_phi[[1]]),decreasing = T)[1:5]
+# sort(col_sums(w_network_vary_with_phi_Dantzig[[1]]),decreasing = T)[1:5]
+# # CHD       PNW       IRM        KR       NEM 
+# sort(col_sums(w_network_vary_with_phi_glasso[[1]]),decreasing = T)[1:5]
+# sort(col_sums(w_network_vary_with_phi_3constraint[[1]]),decreasing = T)[1:5]
+# sort(col_sums(w_network_vary_with_phi_3constraint_Dantzig[[1]]),decreasing = T)[1:5]
+# # CHD      PNW       KR      BLK      NEM 
+# sort(col_sums(w_network_vary_with_phi_3constraint_glasso[[1]]),decreasing = T)[1:5]
+# 
+# 

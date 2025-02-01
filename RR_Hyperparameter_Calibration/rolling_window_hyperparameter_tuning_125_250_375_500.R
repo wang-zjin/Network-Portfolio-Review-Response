@@ -662,8 +662,8 @@ C_in=eigenvector_centrality$correlation_matrix
 COV_in=eigenvector_centrality$covariance_matrix
 
 lmd1.WS750 = 0.3592
-lmd2.WS750= 0.001682136
-lmd3.WS750 =0.2782
+lmd2.WS750 = 0.001682136
+lmd3.WS750 = 0.2782
 
 theta1<-list()
 theta2<-list()
