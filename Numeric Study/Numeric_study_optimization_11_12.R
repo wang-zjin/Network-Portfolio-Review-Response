@@ -10,7 +10,7 @@ library(Matrix)
 
 
 ###### The optimization (1) and (2) can generate same value ######
-rep = 20000
+rep = 1000
 Obj_1 = matrix(NA,rep,1)
 Obj_2 = matrix(NA,rep,1)
 
@@ -153,5 +153,5 @@ mean(rl_err)
 sd(rl_err)
 
 
-
+t.test(rl_err,mu=0)
 
