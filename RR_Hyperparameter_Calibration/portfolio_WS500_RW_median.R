@@ -330,7 +330,7 @@ w<-t(matrix(unlist(w),p,T.windows))
 colnames(w) = node.label
 w_minVar<-w
 
-##### minimum variance portfolio with glasso #####
+###### minimum variance portfolio with glasso #####
 w<-list()
 cumureturn<-list()
 for(t in 1: length(W_in)){
