@@ -803,6 +803,41 @@ linfun1=function(Sn,b,lambda)
   # return(solvetheta)
   return(solvetheta)
 }
+# What's new in "linfun1_1" is that we added a time controler
+linfun1_1=function(Sn,b,lambda)
+{
+  #equivalent to solving   min 1'u
+  #such that		u-x>=0
+  #						u+x>=0
+  #						-hatS x>=-(lambda 1+b)
+  #						hatS x>=-lambda 1+b
+  #						x^T1=1
+  p = length(b)
+  a=rep(0,2*p)
+  a[c(1,1+p)]=1
+  A0=toeplitz(a)
+  A0[upper.tri(A0)]=-A0[upper.tri(A0)]
+  A1=cbind(matrix(0,p,p),-Sn)
+  A2=-A1
+  A=rbind(A0,A1,A2)
+  rhs=c(rep(0,2*p),c(-b,b)-lambda*rep(1,2*p))
+  C=rep(c(1,0),c(p,p))
+  
+  # Setting time limit for linp
+  setTimeLimit(elapsed = 100)  # e.g., 10 seconds max for linp
+  
+  solvetheta <- tryCatch({
+    linp(G = A, H = rhs, Cost = C, ispos = FALSE)$X[(p+1):(2*p)]
+  }, error = function(e) {
+    message("linp exceeded time limit or encountered an error: ", e$message)
+    return(rep(0, length(b)))  # Fallback to a default value if linp fails
+  })
+  
+  # Reset time limit
+  setTimeLimit(cpu = Inf, elapsed = Inf)
+  
+  return(solvetheta)
+}
 ##### portfolio using Dantzig type selector with 2 constraints #####
 linfun2=function(Sn,b1,b2,lambda)
 {
@@ -1332,6 +1367,52 @@ estimate_dantzig_lambda1_portfolio_parameter = function(file_name = "SP500 secur
   toc()
 }
 
+estimate_dantzig_lambda1_portfolio_parameter_simplified = function(returnstd, window_size){
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/5)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  lmd.i=c()
+  for (valid.block in 1:5) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    mu.train=rep(1,p)
+    mu.valid=rep(1,p)
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l=NULL
+    time_threshold = 300
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      cat("Iteration", i, "of", l.lambda, "\n")
+      
+      lin.train <- linfun1(cov.train, mu.train, lmd)
+      if (!all(lin.train == 0)) {
+        error <- sum((cov.valid %*% lin.train - mu.valid)^2)
+        cv.l.error <- c(cv.l.error, error)
+        cv.l <- c(cv.l, lmd)
+      }
+    }
+    
+    lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd1=mean(lmd.i[lmd.i<Inf])
+  return(lmd1)
+}
+
+
+
 ##### CV for tuning lambda in estimation Sigma^-1 mu, using the first "windowsize"(500/750/1000) data ######
 
 estimate_dantzig_lambda2_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
@@ -1709,6 +1790,111 @@ estimate_rollingwindow_dantzig_lambda1_portfolio_parameter = function(file_name 
   toc()
 }
 
+# This version controls time for each  optimization lin1_1
+estimate_rollingwindow_dantzig_lambda1_portfolio_parameter_timecontrol = function(file_name = "SP500 securities_up_20230306.csv", 
+                                                                      window_size=375){
+  
+  tic("CV hyperparameter lambda1 for Portfolio Parameter by Dantzig-type selector")
+  
+  # load data
+  prices<-read.csv(file_name)
+  ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-%m-%d'))
+  
+  #return
+  return<- Return.calculate(ZOO, method="log")
+  return<- return[-1, ]
+  returnstd<-xts(return)
+  p=dim(return)[2]
+  
+  # set label
+  node.label=colnames(returnstd)
+  names(returnstd) = node.label
+  
+  # Calibrate the hyperparameter lambda1 of Dantzig Selector for portfolio parameter phi_1 estimation, using rolling window
+  
+  tic("Tuning parameter of Dantzig estimation")
+  # rolling window
+  W<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W[[(t+1)]]=returnstd[(1+t*22):((window_size+22)+t*22),]
+  }
+  W_in<-list()
+  W_out<-list()
+  for(t in 0: (floor((1857-window_size)/22)-1)){
+    W_in[[(t+1)]]=W[[t+1]][c(1:window_size),]
+    W_out[[(t+1)]]=W[[t+1]][c((window_size+1):(window_size+22)),]
+  }
+  T.windows<-length(W)
+  # correlation matrix, Expected return, covariance matrix
+  C_in <- list()
+  ER_in <- list()
+  COV_in <- list()
+  EC_in <- list()
+  for(t in 1: length(W_in)){
+    C_in[[(t)]] =cor(W_in[[(t)]])
+    ER_in[[(t)]] = colMeans(W_in[[(t)]])
+    COV_in[[(t)]] = cov(W_in[[(t)]])
+    network_port = network.correlation(W_in[[(t)]])
+    EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
+    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
+  }
+  
+  lmd1.Dantzig.list = list()
+  for (t in c(1:T.windows)) {
+    
+    # Use for recurrence
+    n<-dim(W_in[[(t)]])[1]
+    B=floor(window_size/3) # 3-fold cross validation
+    n.block=floor(n/B)
+    block.start=1+(0:(n.block-1))*B
+    # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+    lmd.i=c()
+    for (valid.block in 1:3) {
+      valid.ind=NULL
+      for(k in valid.block){
+        valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+      }
+      n.valid=length(valid.ind)
+      train.ind=setdiff(1:n,valid.ind)
+      n.train=length(train.ind)
+      returnstd.train=W_in[[(t)]][train.ind,]
+      returnstd.valid=W_in[[(t)]][valid.ind,]
+      mu.train=rep(1,p)
+      mu.valid=rep(1,p)
+      cov.train=cov(returnstd.train)
+      cov.valid=cov(returnstd.valid)
+      lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+      l.lambda=length(lambda.grid)
+      cv.l.error=NULL
+      cv.l=NULL
+      time_threshold = 1000
+      for(i in 1:l.lambda){
+        lmd=lambda.grid[i]
+        cat("Iteration", i, "of", l.lambda, "\n")
+        
+        lin.train <- linfun1_1(cov.train, mu.train, lmd)
+        if (!all(lin.train == 0)) {
+          error <- sum((cov.valid %*% lin.train - mu.valid)^2)
+          cv.l.error <- c(cv.l.error, error)
+          cv.l <- c(cv.l, lmd)
+        }
+      }
+      
+      lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+    }
+    lmd1=mean(lmd.i[lmd.i<Inf])
+    lmd1.Dantzig.list[[t]] <- lmd1
+  }
+  
+  
+  dantzig_lambda1_portfolio_parameter = list("lmd1.list"=lmd1.Dantzig.list)
+  save(dantzig_lambda1_portfolio_parameter,file = paste0("dantzig_lambda1_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
+  
+  toc()
+}
+
 ##### CV for tuning lambda in estimation Sigma^-1 mu, using the rolling "windowsize"(500/750/1000) data ######
 
 estimate_rollingwindow_dantzig_lambda2_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
@@ -1791,7 +1977,6 @@ estimate_rollingwindow_dantzig_lambda2_portfolio_parameter = function(file_name 
         lmd=lambda.grid[i]
         print(i)
         
-        
         lin.train=linfun1(cov.train,mu.train,lmd)
         if(!(all(lin.train==0))){
           error=sum((cov.valid%*%lin.train-mu.valid)^2)
@@ -1856,9 +2041,6 @@ estimate_rollingwindow_dantzig_lambda3_portfolio_parameter = function(file_name 
     COV_in[[(t)]] = cov(W_in[[(t)]])
     network_port = network.correlation(W_in[[(t)]])
     EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
-    max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
-    min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
-    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
   }
   
   
