@@ -16,6 +16,8 @@ libraries = c("matrixcalc", "MASS", "PortfolioAnalytics",
               "MTS","Matrix","pracma","glasso","MST", "IntroCompFinR",
               "RColorBrewer", "broom", "egg", "nloptr", "fAssets",
               "magick","tictoc") 
+
+# install.packages("IntroCompFinR", repos="http://R-Forge.R-project.org")
               
 lapply(libraries, function(x) if (!(x %in% installed.packages())) {
   install.packages(x)
