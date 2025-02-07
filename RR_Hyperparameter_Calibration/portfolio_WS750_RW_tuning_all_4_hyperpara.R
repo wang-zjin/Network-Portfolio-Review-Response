@@ -1,6 +1,6 @@
 rm(list = ls())
 
-setwd("~/Documents/GitHub/Network-Portfolio/RR_Hyperparameter_Calibration")
+setwd("~/Documents/GitHub/Network-Portfolio-Review-Response/RR_Hyperparameter_Calibration")
 
 # Load Functions and other Files
 source('./PackagesNetworkPortfolio.R')
@@ -86,7 +86,7 @@ w_minVar<-w
 w<-list()
 cumureturn<-list()
 for(t in 1: length(W_in)){
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
   w[[t]]=row_sums(glasso.icov)/sum(glasso.icov)
   aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
   cumureturn[[t]]<-rowSums(aus)
@@ -147,7 +147,7 @@ w_meanVar_Dantzig<-w
 w<-list()
 cumureturn<-list()
 for(t in 1: length(W_in)){
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
   alpha=(sum(glasso.icov%*%ER_in[[t]])*sum(glasso.icov)*mean(ER_in[[t]])-(sum(glasso.icov%*%ER_in[[t]]))^2)/(ER_in[[(t)]]%*%glasso.icov%*%ER_in[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%ER_in[[t]]))^2)
   w[[(t)]] = c(alpha[1]*glasso.icov%*%ER_in[[t]]/sum(glasso.icov%*%ER_in[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
   aus<-as.matrix(repmat(w[[(t)]],22,1)*W_out[[t]])
@@ -233,7 +233,7 @@ w<-list()
 cumureturn_temporal<-list()
 for(t in 1: length(W_in)){
   ## compute global minimum variance portfolio without short ##
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
   if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[t]])>mean(EC_DS[[t]])){
     alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*mean(EC_DS[[t]])-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
     w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
@@ -325,7 +325,7 @@ for (i in 1:length(quantl)) {
   cumureturn_temporal<-list()
   for(t in 1: length(W_in)){
     ## compute global minimum variance portfolio ##glasso.icov=glasso(COV_in[[(t)]],rho=rho)$wi
-    glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+    glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
     if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[t]]))>quantile(EC_DS[[(t)]],quantl[i])){
       alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*quantile(EC_DS[[(t)]],quantl[i])-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
       w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
@@ -415,7 +415,7 @@ w<-list()
 cumureturn_temporal<-list()
 for(t in 1: length(W_in)){
   ## compute global minimum variance portfolio ##
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
   if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[t]])>phi_star[[t]]){
     alpha=c((sum(glasso.icov%*%EC_DS[[t]])*sum(glasso.icov)*phi_star[[t]]-(sum(glasso.icov%*%EC_DS[[t]]))^2)/(EC_DS[[(t)]]%*%glasso.icov%*%EC_DS[[t]]*sum(glasso.icov)-(sum(glasso.icov%*%EC_DS[[t]]))^2))
     w[[(t)]] = c(alpha[1]*glasso.icov%*%EC_DS[[t]]/sum(glasso.icov%*%EC_DS[[t]])+(1-alpha[1])*row_sums(glasso.icov)/sum(glasso.icov))
@@ -526,7 +526,7 @@ w<-list()
 cumureturn_temporal<-list()
 for(t in 1: length(W_in)){
   ## compute 3 constraint network portfolio ##
-  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+  glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
   if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[(t)]])>mean(EC_DS[[t]])){
     if(c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(ER_in[[(t)]])<mean(ER_in[[t]])){
       # 3 constraint case
@@ -677,7 +677,7 @@ for (i in 1:length(quantl)) {
   cumureturn_temporal<-list()
   for(t in 1: length(W_in)){
     ## network portfolio varying constraint with glasso estimation ##
-    glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso)$wi
+    glasso.icov=glasso(COV_in[[(t)]],rho=rho_glasso[[t]])$wi
     if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(EC_DS[[(t)]]))>quantile(EC_DS[[(t)]],quantl[i])){
       if((c(row_sums(glasso.icov)/sum(glasso.icov))%*%c(ER_in[[(t)]]))<mean(ER_in[[t]])){
         # 3 constraint case
