@@ -1479,6 +1479,49 @@ estimate_dantzig_lambda2_portfolio_parameter = function(file_name = "SP500 secur
   toc()
 }
 
+estimate_dantzig_lambda2_portfolio_parameter_simplified = function(returnstd, window_size){
+  
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/3)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  lmd.i=c()
+  for (valid.block in 1:3) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    mu.train=colMeans(returnstd.train)
+    mu.valid=colMeans(returnstd.valid)
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    lambda.grid=seq(min(max(abs(mu.train))/100,min(abs(mu.train))), 0.01,length=101)[2:100]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l=NULL
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      print(i)
+      
+      lin.train=linfun1(cov.train,mu.train,lmd)
+      if(!(all(lin.train==0))){
+        error=sum((cov.valid%*%lin.train-mu.valid)^2)
+        cv.l.error=c(cv.l.error,error)
+        cv.l=c(cv.l,lmd)
+      }
+    }
+    lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd2=mean(lmd.i[lmd.i<Inf])
+  return(lmd2)
+}
+
 ##### CV for tuning lambda in estimation Sigma^-1 phi, using the first "windowsize"(500/750/1000) data ######
 estimate_dantzig_lambda3_portfolio_parameter = function(file_name = "SP500 securities_up_20230306.csv", window_size=375){
   
@@ -1547,6 +1590,50 @@ estimate_dantzig_lambda3_portfolio_parameter = function(file_name = "SP500 secur
   
   toc()
   
+}
+
+estimate_dantzig_lambda3_portfolio_parameter = function(returnstd, window_size){
+  
+  n<-dim(returnstd[1:window_size,])[1]
+  B=floor(window_size/3)
+  n.block=floor(n/B)
+  block.start=1+(0:(n.block-1))*B
+  # valid.block=sort(sample(1:n.block,floor(n.block/4)))
+  lmd.i=c()
+  for (valid.block in 1:3) {
+    valid.ind=NULL
+    for(k in valid.block){
+      valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
+    }
+    n.valid=length(valid.ind)
+    train.ind=setdiff(1:n,valid.ind)
+    n.train=length(train.ind)
+    returnstd.train=returnstd[1:window_size,][train.ind,]
+    returnstd.valid=returnstd[1:window_size,][valid.ind,]
+    cov.train=cov(returnstd.train)
+    cov.valid=cov(returnstd.valid)
+    mu.train=EC_DS[[1]]
+    mu.valid=EC_DS[[1]]
+    lambda.grid=seq(0.1, max(mu.train),length=101)[1:100]
+    l.lambda=length(lambda.grid)
+    cv.l.error=NULL
+    cv.l=NULL
+    for(i in 1:l.lambda){
+      lmd=lambda.grid[i]
+      print(i)
+      # lmd=0.1
+      lin.train=linfun1(cov.train,mu.train,lmd)
+      # sum(lin.train==0)
+      if(!(all(lin.train==0))){
+        error=sum((cov.valid%*%lin.train-mu.valid)^2)
+        cv.l.error=c(cv.l.error,error)
+        cv.l=c(cv.l,lmd)
+      }
+    }
+    lmd.i[valid.block]=min(cv.l[which(cv.l.error==min(cv.l.error))])
+  }
+  lmd3=mean(lmd.i[lmd.i<Inf])
+  return(lmd3)
 }
 
 ##### CV for tuning parameter in glasso, using the first "windowsize"(500/750/1000) data #####
