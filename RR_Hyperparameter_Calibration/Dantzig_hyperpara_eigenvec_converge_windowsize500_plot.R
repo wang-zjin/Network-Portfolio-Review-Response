@@ -37,7 +37,7 @@ plot_dantzig <- ggplot(plot_data, aes(x = x)) +
   scale_color_manual(values = c("rho^E (WS500)" = "blue", "median(rho^E) (WS500)" = "red")) +  # Explicit colors
   labs(
     x = "",
-    y = "Hyperparameter Value",
+    y = "Hyperparameter rho^E Value",
     color = "Legend"
   ) +
   theme(
