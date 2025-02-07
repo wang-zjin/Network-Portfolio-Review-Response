@@ -115,6 +115,7 @@ EC_DS =linfun3_1(estimated_A-diag(1,3,3)-diag(max(eigen(estimated_A)$value),3,3)
 EC_DS=EC_DS/max(EC_DS)
 
 phi_star = mean(EC_DS)
+mu_star = 0
 
 ###### minimum variance portfolio  #####
 portf_minVar =globalMin.portfolio(estimated_mu,estimated_Sigma)
@@ -140,7 +141,7 @@ cumureturn_equal<-cumprod(return_equal)
 w_equal<-w
 
 ###### PLug-In 2 constraints network portfolio #####
-net.gmin.port = network.efficient.portfolio(EC_DS, estimated_Sigma, phi_star,TRUE)
+net.gmin.port = network.efficient.portfolio(EC_DS, estimated_Sigma, phi_star,FALSE)
 w =net.gmin.port$weights
 aus<-as.matrix(repmat(w,n_outsample,1)*data_out)
 return_network_vary_with_phi<-rowSums(aus)+1
@@ -148,7 +149,7 @@ cumureturn_network_vary_with_phi<-cumprod(return_network_vary_with_phi)
 w_network_vary_with_phi<-w
 
 ###### PLug-In 3 constraints network portfolio #####
-net.gmin.port = network.3constraint.portfolio(EC_DS, estimated_mu, estimated_Sigma, phi_star, mu_star, TRUE)
+net.gmin.port = network.3constraint.portfolio(EC_DS, estimated_mu, estimated_Sigma, phi_star, mu_star, FALSE)
 w =net.gmin.port$weights
 aus<-as.matrix(repmat(w,n_outsample,1)*data_out)
 return_network_3constraint_plugin<-rowSums(aus)+1
@@ -156,14 +157,14 @@ cumureturn_network_3constraint_plugin<-cumprod(return_network_3constraint_plugin
 w_network_3constraint_plugin<-w
 
 ###### Monte Carlo 2 constraints portfolio #####
-w = MonteCarlo_network_2constraint_noshort_portfolio(n_samples, Sigma, EC_DS, phi_star)
+w = MonteCarlo_network_2constraint_noshort_portfolio(n_samples, estimated_Sigma, EC_DS, phi_star)
 aus<-as.matrix(repmat(w,n_outsample,1)*data_out)
 return_network_MC_2constraint<-rowSums(aus)+1
 cumureturn_network_MC_2constraint<-cumprod(return_network_MC_2constraint)
 w_network_MC_2constraint<-w
 
 ###### Monte Carlo 3 constraints portfolio #####
-w = MonteCarlo_network_3constraint_noshort_portfolio(n_samples, Sigma, EC_DS, phi_star, estimated_mu, mu_star)
+w = MonteCarlo_network_3constraint_noshort_portfolio(n_samples, estimated_Sigma, EC_DS, phi_star, estimated_mu, mu_star)
 aus<-as.matrix(repmat(w,n_outsample,1)*data_out)
 return_network_MC_3constraint<-rowSums(aus)+1
 cumureturn_network_MC_3constraint<-cumprod(return_network_MC_3constraint)
