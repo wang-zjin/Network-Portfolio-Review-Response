@@ -167,7 +167,7 @@ EC_DS=EC_DS/max(EC_DS)
 
 
 relative_error_list1 = c()
-lmd1.list = seq(0.01,1,length=100)
+lmd1.list = seq(0.01,0.99,length=100)
 l.lmd1 = length(lmd1.list)
 theta1.list = list()
 for(i in 1:l.lmd1){
@@ -189,7 +189,7 @@ for(i in 1:l.lmd2){
 }
 
 relative_error_list3 = c()
-lmd3.list = seq(0.001,1,length=100)
+lmd3.list = seq(0.001,0.99,length=100)
 l.lmd3 = length(lmd3.list)
 theta3.list = list()
 for(i in 1:l.lmd3){
@@ -307,6 +307,7 @@ for (i1 in 1:num_lambda) {
 # Install and load plotly if you haven't already
 # install.packages("plotly")
 library(plotly)
+library(htmlwidgets)
 
 # Create a 3D scatter plot for error_2constraint
 fig <- plot_ly(
@@ -320,8 +321,25 @@ fig <- plot_ly(
   mode = "markers",
   marker = list(size = 3)
 )
-
 fig  # This will open an interactive window in your viewer/browser.
+# Save the Plotly figure as an HTML file
+saveWidget(as_widget(fig), "plotly_3d_scatter_2constraint.html")
+
+# Create a 3D scatter plot for error_2constraint
+fig <- plot_ly(
+  data = results,
+  x = ~lmd1,
+  y = ~lmd2,
+  z = ~lmd3,
+  color = ~error_3constraint,   # use error_3constraint for the other error measure
+  colors = colorRamp(c("blue", "red")),
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(size = 3)
+)
+fig  # This will open an interactive window in your viewer/browser.
+# Save the Plotly figure as an HTML file
+saveWidget(as_widget(fig), "plotly_3d_scatter_3constraint.html")
 
 #### Second case #####
 
