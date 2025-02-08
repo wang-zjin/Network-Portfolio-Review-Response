@@ -667,6 +667,19 @@ for (i in 1:length(quantl)) {
   w_network_vary_with_phi_3constraint_Dantzig[[i]]<-w
 }
 
+sum(is.na(w_network_vary_with_phi_3constraint_Dantzig[[i]]))
+
+# Extract the matrix (for readability)
+mat <- w_network_vary_with_phi_3constraint_Dantzig[[i]]
+# Create a logical vector: TRUE for rows with any NA, FALSE otherwise
+na_in_row <- apply(mat, 1, function(row) any(is.na(row)))
+# To see which row indices have NAs:
+rows_with_na <- which(na_in_row)
+print(rows_with_na)
+
+mat[43,]
+mat[48,]
+
 ###### network portfolio varying constraint with glasso ######
 cumureturn_network_vary_with_phi_3constraint_glasso<-list()
 return_network_vary_with_phi_3constraint_glasso<-list()
