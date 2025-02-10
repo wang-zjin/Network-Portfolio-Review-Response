@@ -34,6 +34,7 @@ plot_data <- data.frame(
 plot_dantzig <- ggplot(plot_data, aes(x = x)) +
   geom_line(aes(y = median_rho_500, color = "median(rho^E) (WS500)"), size = 1) +  
   scale_color_manual(values = c("median(rho^E) (WS500)" = "red")) +  # Explicit colors
+  scale_y_continuous(limits = c(0, 1)) +  # Fix y-axis from 0 to 1
   labs(
     x = "",
     y = "",
