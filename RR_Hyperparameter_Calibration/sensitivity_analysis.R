@@ -143,7 +143,7 @@ cat("Relative error:", relative_error_Sigma, "\n")
 
 error_norm <- norm(inv(estimated_Sigma) - inv(Sigma), type = "F")
 cat("Frobenius norm of the error:", error_norm, "\n")
-relative_error_Sigma_inv <- error_norm / norm(Sigma, type = "F")
+relative_error_Sigma_inv <- error_norm / norm(inv(estimated_Sigma), type = "F")
 cat("Relative error:", relative_error_Sigma_inv, "\n")
 
 # Estimate Eigenvector centrality
