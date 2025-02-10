@@ -83,7 +83,7 @@ ZOO <- zoo(prices[,-1], order.by=as.Date(as.character(prices$Dates), format='%Y-
 
 #return
 return<- Return.calculate(ZOO, method="log")
-return<- return[-1, 1:10]
+return<- return[-1, 1:3]
 returnstd<-xts(return)
 # p=dim(return)[2]
 p=dim(return)[2]
@@ -211,14 +211,36 @@ for(i in 1:l.lmd3){
 # estimated_Sigma %*% theta3
 
 ###### Dantzig 2 constraints network portfolio #####
-# if((c(theta1/sum(theta1))%*%c(EC_DS))>phi_star){
-#   alpha=c((sum(theta3)*sum(theta1)*phi_star-(sum(theta3))^2)/(EC_DS%*%theta3*sum(theta1)-(sum(theta3))^2))
-#   w = alpha*theta3/sum(theta3)+(1-alpha)*theta1/sum(theta1)
-# } else {
-#   w = theta1/sum(theta1)
-# }
-# w[is.na(w)] <- 0
-# w_2constraint_dantzig<-w
+if((c(theta1/sum(theta1))%*%c(EC_DS))>phi_star){
+  gamma = (sum(theta1) + 1)/sum(theta3) 
+  w = gamma * theta3 - theta1
+  sum(w)
+  inv(Sigma)
+  Sigma %*% inv(Sigma) 
+  (inv(Sigma)) %*% matrix(1,3,1)
+  (inv(Sigma)) %*% mu
+  (inv(Sigma)) %*% EC_DS
+  gamma1 = (sum((inv(Sigma)) %*% matrix(1,3,1)) + 1)/sum((inv(Sigma)) %*% EC_DS) 
+  w1 = gamma1 * (inv(Sigma)) %*% EC_DS - (inv(Sigma)) %*% matrix(1,3,1)
+  sum(w)
+  w - w1
+  gamma - gamma1
+  theta3 - inv(Sigma) %*% EC_DS
+  theta1 - inv(Sigma) %*% matrix(1,3,1)
+  
+  
+  
+  
+  Sigma %*% theta1
+  Sigma %*% theta2
+  Sigma %*% theta3
+  alpha=c((sum(theta3)*sum(theta1)*phi_star-(sum(theta3))^2)/(EC_DS%*%theta3*sum(theta1)-(sum(theta3))^2))
+  w = alpha*theta3/sum(theta3)+(1-alpha)*theta1/sum(theta1)
+} else {
+  w = theta1/sum(theta1)
+}
+w[is.na(w)] <- 0
+w_2constraint_dantzig<-w
 # 
 # ###### Dantzig 3 constraints network portfolio #####
 # if((c(theta1/sum(theta1))%*%c(EC_DS))>phi_star){
@@ -274,7 +296,7 @@ results <- data.frame(
   error_2constraint = numeric(),
   error_3constraint = numeric()
 )
-num_lambda = 10
+num_lambda = 20
 for (i1 in 1:num_lambda) {
   for (i2 in 1:num_lambda) {
     for (i3 in 1:num_lambda) {
@@ -315,7 +337,7 @@ fig <- plot_ly(
   x = ~lmd1,
   y = ~lmd2,
   z = ~lmd3,
-  color = ~error_2constraint,   # use error_3constraint for the other error measure
+  color = ~error_2constraint,   
   colors = colorRamp(c("blue", "red")),
   type = "scatter3d",
   mode = "markers",
@@ -331,7 +353,7 @@ fig <- plot_ly(
   x = ~lmd1,
   y = ~lmd2,
   z = ~lmd3,
-  color = ~error_3constraint,   # use error_3constraint for the other error measure
+  color = ~error_3constraint,   
   colors = colorRamp(c("blue", "red")),
   type = "scatter3d",
   mode = "markers",
