@@ -9,35 +9,35 @@ source('./PackagesNetworkPortfolio.R')
 source('./FunctionsNetworkPortfolio.R')
 
 # Define the rolling window size
-window_size = 500
+window_size = 750
 
 # Load the precomputed Dantzig lambda values for eigenvector centrality
-load(paste0("Dantzig_lambda_rolling_window_windowsize",window_size,".RData"))
+load(paste0("dantzig_lambda3_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
 
 # Unlist the Dantzig lambda values and store them in a vector
-lmd.EC.Dantzig = unlist(lmd.EC.Dantzig.list)
+lmd3.EC.Dantzig = unlist(dantzig_lambda3_portfolio_parameter)
 
 # Create a sequence for the x-axis
-x_500 = 1:length(lmd.EC.Dantzig)
+x_750 = 1:length(lmd3.EC.Dantzig)
 
 # Compute the rolling median of the Dantzig lambda values
-median_rho_500 = sapply(1:length(lmd.EC.Dantzig), function(i) median(lmd.EC.Dantzig[1:i]))
+median_lambda3_750 = sapply(1:length(lmd3.EC.Dantzig), function(i) median(lmd3.EC.Dantzig[1:i]))
 
 # Convert your data into a data frame
 plot_data <- data.frame(
-  x = x_500,
-  lmd_EC_Dantzig = lmd.EC.Dantzig,  # Dantzig lambda values
-  median_rho_500 = median_rho_500   # Rolling median values
+  x = x_750,
+  lambda3_Dantzig = lmd3.EC.Dantzig,  # Dantzig lambda values
+  median_lambda3_750 = median_lambda3_750   # Rolling median values
 )
 
 # Create the plot using ggplot2
 plot_dantzig <- ggplot(plot_data, aes(x = x)) +
-  geom_line(aes(y = lmd_EC_Dantzig, color = "rho^E (WS500)"), size = 1) +  # First line
-  geom_line(aes(y = median_rho_500, color = "median(rho^E) (WS500)"), size = 1) +  # Second line
-  scale_color_manual(values = c("rho^E (WS500)" = "blue", "median(rho^E) (WS500)" = "red")) +  # Explicit colors
+  geom_line(aes(y = lambda3_Dantzig, color = "lambda_3 (WS750)"), size = 1) +  # First line
+  geom_line(aes(y = median_lambda3_750, color = "median(lambda_3) (WS750)"), size = 1) +  # Second line
+  scale_color_manual(values = c("lambda_3 (WS750)" = "blue", "median(lambda_3) (WS750)" = "red")) +  # Explicit colors
   labs(
     x = "",
-    y = "Hyperparameter rho^E Value",
+    y = "Hyperparameter lambda_3 Value",
     color = "Legend"
   ) +
   theme(
@@ -50,7 +50,7 @@ plot_dantzig <- ggplot(plot_data, aes(x = x)) +
   )
 
 # Save the plot
-ggsave(filename = "Dantzig_hyper_eigenvector_converge_rollingwindow_500.png",
+ggsave(filename = "Dantzig_hyper_portfolio_lambda3_converge_rollingwindow_750.png",
        plot = plot_dantzig,
        width = 10,
        height = 6,

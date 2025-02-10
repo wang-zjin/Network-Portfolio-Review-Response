@@ -9,7 +9,7 @@ source('./PackagesNetworkPortfolio.R')
 source('./FunctionsNetworkPortfolio.R')
 
 # Define the rolling window size
-window_size = 500
+window_size = 250
 
 # Load the precomputed Dantzig lambda values for eigenvector centrality
 load(paste0("Dantzig_lambda_rolling_window_windowsize",window_size,".RData"))
@@ -18,23 +18,23 @@ load(paste0("Dantzig_lambda_rolling_window_windowsize",window_size,".RData"))
 lmd.EC.Dantzig = unlist(lmd.EC.Dantzig.list)
 
 # Create a sequence for the x-axis
-x_500 = 1:length(lmd.EC.Dantzig)
+x_250 = 1:length(lmd.EC.Dantzig)
 
 # Compute the rolling median of the Dantzig lambda values
-median_rho_500 = sapply(1:length(lmd.EC.Dantzig), function(i) median(lmd.EC.Dantzig[1:i]))
+median_rho_250 = sapply(1:length(lmd.EC.Dantzig), function(i) median(lmd.EC.Dantzig[1:i]))
 
 # Convert your data into a data frame
 plot_data <- data.frame(
-  x = x_500,
+  x = x_250,
   lmd_EC_Dantzig = lmd.EC.Dantzig,  # Dantzig lambda values
-  median_rho_500 = median_rho_500   # Rolling median values
+  median_rho_250 = median_rho_250   # Rolling median values
 )
 
 # Create the plot using ggplot2
 plot_dantzig <- ggplot(plot_data, aes(x = x)) +
-  geom_line(aes(y = lmd_EC_Dantzig, color = "rho^E (WS500)"), size = 1) +  # First line
-  geom_line(aes(y = median_rho_500, color = "median(rho^E) (WS500)"), size = 1) +  # Second line
-  scale_color_manual(values = c("rho^E (WS500)" = "blue", "median(rho^E) (WS500)" = "red")) +  # Explicit colors
+  geom_line(aes(y = lmd_EC_Dantzig, color = "rho^E (WS250)"), size = 1) +  # First line
+  geom_line(aes(y = median_rho_250, color = "median(rho^E) (WS250)"), size = 1) +  # Second line
+  scale_color_manual(values = c("rho^E (WS250)" = "blue", "median(rho^E) (WS250)" = "red")) +  # Explicit colors
   labs(
     x = "",
     y = "Hyperparameter rho^E Value",
@@ -50,7 +50,7 @@ plot_dantzig <- ggplot(plot_data, aes(x = x)) +
   )
 
 # Save the plot
-ggsave(filename = "Dantzig_hyper_eigenvector_converge_rollingwindow_500.png",
+ggsave(filename = "Dantzig_hyper_eigenvector_converge_rollingwindow_250.png",
        plot = plot_dantzig,
        width = 10,
        height = 6,
