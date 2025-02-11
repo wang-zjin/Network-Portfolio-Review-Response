@@ -124,7 +124,7 @@ w =net.gmin.port$weights
 w_network_3constraint_plugin<-w
 
 # Number of observations to generate
-n_simu <- 100000
+n_simu <- 10000
 
 # Generate multivariate normal data
 data <- mvrnorm(n = n_simu, mu = mu, 
