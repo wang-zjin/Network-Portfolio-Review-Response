@@ -53,6 +53,8 @@ plot_dantzig <- ggplot(plot_data, aes(x = x)) +
     plot.background = element_rect(fill = "transparent", color = NA),   # Make plot background transparent
     panel.border = element_rect(color="black", fill=NA, size=1),
     axis.title.y = element_text(size = 24),
+    axis.text.y = element_text(size = 24),
+    axis.text.x = element_text(size = 20),
     legend.position = "none"  # Remove the legend
   )
 
