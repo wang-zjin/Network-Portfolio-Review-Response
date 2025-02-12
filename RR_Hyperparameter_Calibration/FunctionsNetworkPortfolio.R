@@ -823,14 +823,15 @@ linfun1_1=function(Sn,b,lambda)
   rhs=c(rep(0,2*p),c(-b,b)-lambda*rep(1,2*p))
   C=rep(c(1,0),c(p,p))
   
-  # Setting time limit for linp
-  setTimeLimit(elapsed = 100)  # e.g., 10 seconds max for linp
-  
   solvetheta <- tryCatch({
-    linp(G = A, H = rhs, Cost = C, ispos = FALSE)$X[(p+1):(2*p)]
+    # Setting time limit for linp
+    setTimeLimit(elapsed = 60)  # e.g., 10 seconds max for linp
+    sol <- linp(G = A, H = rhs, Cost = C, ispos = FALSE,verbose=TRUE)$X[(p+1):(2*p)]
+    sol
   }, error = function(e) {
     message("linp exceeded time limit or encountered an error: ", e$message)
-    return(rep(0, length(b)))  # Fallback to a default value if linp fails
+    problematic_lambdas <<- c(problematic_lambdas, lmd)  # 记录出问题的 λ 值
+    NA  # 返回 NA 或者其它默认值，作为该 λ 值的解、
   })
   
   # Reset time limit
@@ -1925,7 +1926,6 @@ estimate_rollingwindow_dantzig_lambda1_portfolio_parameter_timecontrol = functio
     EC_in[[(t)]] <- eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector
     max(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
     min(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
-    boxplot(eigen_centrality(network_port,directed = FALSE, scale = TRUE)$vector)
   }
   
   lmd1.Dantzig.list = list()
@@ -1938,7 +1938,7 @@ estimate_rollingwindow_dantzig_lambda1_portfolio_parameter_timecontrol = functio
     block.start=1+(0:(n.block-1))*B
     # valid.block=sort(sample(1:n.block,floor(n.block/4)))
     lmd.i=c()
-    for (valid.block in 1:3) {
+    for (valid.block in c(1,2,3)) {
       valid.ind=NULL
       for(k in valid.block){
         valid.ind=c(valid.ind,block.start[k]:(min(block.start[k]+B-1,n)))
@@ -1952,7 +1952,7 @@ estimate_rollingwindow_dantzig_lambda1_portfolio_parameter_timecontrol = functio
       mu.valid=rep(1,p)
       cov.train=cov(returnstd.train)
       cov.valid=cov(returnstd.valid)
-      lambda.grid=seq(0.1, max(abs(mu.train)),length=101)[2:100]
+      lambda.grid=seq(0.19, max(abs(mu.train)),length=101)[2:100]
       l.lambda=length(lambda.grid)
       cv.l.error=NULL
       cv.l=NULL
@@ -1961,7 +1961,7 @@ estimate_rollingwindow_dantzig_lambda1_portfolio_parameter_timecontrol = functio
         lmd=lambda.grid[i]
         cat("Iteration", i, "of", l.lambda, "\n")
         
-        lin.train <- linfun1_1(cov.train, mu.train, lmd)
+        lin.train <- linfun1_1(Sn=cov.train, b=mu.train, lambda=lmd)
         if (!all(lin.train == 0)) {
           error <- sum((cov.valid %*% lin.train - mu.valid)^2)
           cv.l.error <- c(cv.l.error, error)
@@ -1973,11 +1973,9 @@ estimate_rollingwindow_dantzig_lambda1_portfolio_parameter_timecontrol = functio
     }
     lmd1=mean(lmd.i[lmd.i<Inf])
     lmd1.Dantzig.list[[t]] <- lmd1
+    save(lmd1,file = paste0("dantzig_lambda1_portfolio_parameter_WS",window_size,"_rollingwindow_20250126/dantzig_lambda1_portfolio_parameter_WS",window_size,"_rollingwindow_",t,"_20250126.RData"))
+    
   }
-  
-  
-  dantzig_lambda1_portfolio_parameter = list("lmd1.list"=lmd1.Dantzig.list)
-  save(dantzig_lambda1_portfolio_parameter,file = paste0("dantzig_lambda1_portfolio_parameter_WS",window_size,"_rollingwindow_20250126.RData"))
   
   toc()
 }
